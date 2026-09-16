@@ -466,6 +466,140 @@ h3 {
   color: var(--text);
 }
 
+/* --- Settings ------------------------------------------------------------ */
+
+.settings {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: rise 300ms var(--ease-out) backwards;
+}
+
+.settings-section:nth-child(2) {
+  animation-delay: 40ms;
+}
+.settings-section:nth-child(3) {
+  animation-delay: 80ms;
+}
+.settings-section:nth-child(4) {
+  animation-delay: 120ms;
+}
+.settings-section:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+.settings-rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hairline-out);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 15px;
+  background: var(--panel);
+  transition: background 200ms var(--ease-out);
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--hairline-out);
+}
+
+.settings-row:hover {
+  background: var(--panel-hover);
+}
+
+.settings-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-label {
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+/* Wraps rather than truncates: these lines explain a tradeoff, and half a
+   sentence about a truncated file would be worse than none. */
+.settings-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.35;
+  user-select: text;
+}
+
+.row-control {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+.select {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--panel-hover);
+  border: 1px solid var(--hairline-out);
+  border-radius: 10px;
+  padding: 6px 9px;
+  cursor: pointer;
+  transition: border-color 200ms var(--ease-out);
+}
+
+.select:hover {
+  border-color: var(--text-faint);
+}
+
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 23px;
+  border-radius: 999px;
+  background: var(--track);
+  flex-shrink: 0;
+  transition: background 240ms var(--ease-out);
+}
+
+.toggle[data-on='true'] {
+  background: var(--panel-solid);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  transition: transform 260ms var(--ease-spring);
+}
+
+.toggle[data-on='true'] .toggle-knob {
+  transform: translateX(17px);
+  background: var(--panel-solid-text);
+}
+
 /* --- Scheduled shutdown -------------------------------------------------- */
 
 .power-bar {

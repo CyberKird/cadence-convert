@@ -7,15 +7,20 @@ import type {
   QueueFile,
   ShutdownStatus,
   ThemeMode,
+  UpdateStatus,
+  VideoEncoder,
 } from '../../shared/types'
 import { BOTH_CRF } from '../../shared/types'
 import { countdown } from './format'
 import { QueueRow } from './components/QueueRow'
+import { Settings } from './components/Settings'
 import {
   AlertGlyph,
   ArrowGlyph,
+  BackGlyph,
   FilmGlyph,
   FolderGlyph,
+  GearGlyph,
   MoonGlyph,
   PlusGlyph,
   PowerGlyph,
@@ -64,6 +69,15 @@ export function App() {
   const [busy, setBusy] = useState(false)
   const [dragging, setDragging] = useState(false)
 
+  const [view, setView] = useState<'queue' | 'settings'>('queue')
+  const [update, setUpdate] = useState<UpdateStatus>({
+    state: 'idle',
+    version: null,
+    percent: 0,
+    message: null,
+  })
+  const [detected, setDetected] = useState<VideoEncoder | null>(null)
+
   const [shutdown, setShutdown] = useState<ShutdownStatus>({ armed: false, at: null })
   const [showPower, setShowPower] = useState(false)
   const [hms, setHms] = useState({ h: 1, m: 0, s: 0 })
@@ -79,27 +93,30 @@ export function App() {
   const dragDepth = useRef(0)
 
   useEffect(() => {
-    // Windows reports reduced motion whenever its own animation effects are
-    // off, which is a performance preference far more often than a motion one.
-    // The app animates by default and gates on this attribute instead.
-    document.documentElement.dataset.motion = 'full'
-
     window.api.getSettings().then((s) => {
       setSettings(s)
       applyTheme(s.theme)
+      // Windows reports reduced motion whenever its own animation effects are
+      // off, which is a performance preference far more often than a motion
+      // one. The app follows its own setting rather than that media query.
+      document.documentElement.dataset.motion = s.animations ? 'full' : 'reduced'
     })
     window.api.getAppInfo().then((i) => setVersion(i.version))
     window.api.getFfmpegStatus().then(setFfmpeg)
     window.api.getShutdownStatus().then(setShutdown)
+    window.api.getUpdateStatus().then(setUpdate)
+    window.api.getDetectedEncoder().then(setDetected)
 
     const offStatus = window.api.onFfmpegStatus(setFfmpeg)
     const offProgress = window.api.onProgress((p) => setJobs((prev) => ({ ...prev, [p.id]: p })))
     const offDone = window.api.onFinished(() => setBusy(false))
+    const offUpdate = window.api.onUpdateStatus(setUpdate)
 
     return () => {
       offStatus()
       offProgress()
       offDone()
+      offUpdate()
     }
   }, [])
 
@@ -132,6 +149,15 @@ export function App() {
   }, [settings?.preset])
 
   const patch = useCallback((next: AppSettings) => setSettings(next), [])
+
+  /** One path for every settings change, so side effects cannot be forgotten. */
+  const patchSettings = useCallback((next: Partial<AppSettings>) => {
+    void window.api.updateSettings(next).then((saved) => {
+      setSettings(saved)
+      applyTheme(saved.theme)
+      document.documentElement.dataset.motion = saved.animations ? 'full' : 'reduced'
+    })
+  }, [])
 
   const armSeconds = hms.h * 3600 + hms.m * 60 + hms.s
 
@@ -214,6 +240,7 @@ export function App() {
 
         <div className="spacer" />
 
+        {view === 'queue' && (
         <div className="segmented glass" ref={segRef}>
           {indicator && (
             <span
@@ -234,6 +261,7 @@ export function App() {
             </button>
           ))}
         </div>
+        )}
 
         <button
           className="icon-btn"
@@ -254,6 +282,15 @@ export function App() {
           onClick={() => setShowPower((open) => !open)}
         >
           <PowerGlyph />
+        </button>
+
+        <button
+          className="icon-btn"
+          data-active={view === 'settings' || update.state === 'available'}
+          title={view === 'settings' ? 'Back to the queue' : 'Settings'}
+          onClick={() => setView((v) => (v === 'settings' ? 'queue' : 'settings'))}
+        >
+          {view === 'settings' ? <BackGlyph /> : <GearGlyph />}
         </button>
       </header>
 
@@ -318,6 +355,26 @@ export function App() {
         </div>
       )}
 
+      {view === 'settings' ? (
+        <section className="panel glass">
+          <Settings
+            settings={settings}
+            ffmpeg={ffmpeg}
+            detected={detected}
+            update={update}
+            version={version}
+            onPatch={patchSettings}
+            onPickFolder={async () => {
+              const dir = await window.api.pickOutputDir()
+              if (dir) patchSettings({ outputDir: dir })
+            }}
+            onCheckUpdate={() => void window.api.checkUpdate().then(setUpdate)}
+            onDownloadUpdate={() => void window.api.downloadUpdate().then(setUpdate)}
+            onInstallUpdate={() => void window.api.installUpdate()}
+          />
+        </section>
+      ) : (
+        <>
       <section className="panel glass">
         <div className="panel-head">
           <span className="label">{preset.codec} queue</span>
@@ -427,6 +484,8 @@ export function App() {
           </button>
         )}
       </footer>
+        </>
+      )}
 
       {dragging && (
         <div className="drop-veil">

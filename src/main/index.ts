@@ -13,9 +13,19 @@ import type {
   ThemeMode,
 } from '../shared/types'
 import { BOTH_CRF } from '../shared/types'
-import { activeEncoder, convert, locate, outputPathFor, probe, type RunHandle } from './ffmpeg'
+import {
+  activeEncoder,
+  configure,
+  convert,
+  detectedEncoder,
+  locate,
+  outputPathFor,
+  probe,
+  type RunHandle,
+} from './ffmpeg'
 import * as shutdown from './shutdown'
 import * as store from './store'
+import * as updater from './updater'
 
 let mainWindow: BrowserWindow | null = null
 let ffmpeg: FfmpegStatus = {
@@ -154,10 +164,15 @@ function registerIpc(): void {
     const outputDir = typeof request.outputDir === 'string' ? request.outputDir : ''
 
     stopRequested = false
+
+    const settings = store.read()
+    configure({ encoder: settings.encoder, audioBitrate: settings.audioBitrate })
+
     // An encode that gets suspended halfway leaves a truncated file, so the
     // machine is pinned awake for the whole run and released in the finally
     // below even if something throws.
-    shutdown.holdAwake()
+    const awake = settings.keepAwake
+    if (awake) shutdown.holdAwake()
 
     try {
       for (const entry of request.files) {
@@ -266,7 +281,7 @@ function registerIpc(): void {
         } satisfies JobProgress)
       }
     } finally {
-      shutdown.releaseAwake()
+      if (awake) shutdown.releaseAwake()
     }
 
     send('convert:finished', null)
@@ -280,6 +295,11 @@ function registerIpc(): void {
   ipcMain.handle('shutdown:arm', (_e, seconds: number) => shutdown.arm(seconds))
   ipcMain.handle('shutdown:cancel', () => shutdown.cancel())
   ipcMain.handle('shutdown:status', () => shutdown.status())
+
+  ipcMain.handle('update:status', () => updater.current())
+  ipcMain.handle('update:check', () => updater.check())
+  ipcMain.handle('update:download', () => updater.download())
+  ipcMain.handle('update:install', () => updater.install())
 
   ipcMain.handle('shell:reveal', (_e, path: unknown) => {
     if (typeof path === 'string' && path) shell.showItemInFolder(path)
@@ -295,6 +315,12 @@ function registerIpc(): void {
   ipcMain.handle('settings:setPreset', (_e, preset: Preset) => store.write({ preset }))
   ipcMain.handle('settings:setCrf', (_e, crf: number) => store.write({ crf }))
   ipcMain.handle('settings:setOutputDir', (_e, outputDir: string) => store.write({ outputDir }))
+
+  // One door for the settings screen. store.write revalidates whatever arrives,
+  // so an out of range value is corrected rather than trusted.
+  ipcMain.handle('settings:update', (_e, patch: Partial<AppSettings>) => store.write(patch))
+
+  ipcMain.handle('encoder:detected', () => detectedEncoder())
 }
 
 app.whenReady().then(async () => {
@@ -303,6 +329,9 @@ app.whenReady().then(async () => {
 
   registerIpc()
   createWindow()
+
+  configure({ encoder: settings.encoder, audioBitrate: settings.audioBitrate })
+  updater.init((status) => send('update:status', status))
 
   const found = await locate()
   const enc = activeEncoder()
@@ -314,6 +343,10 @@ app.whenReady().then(async () => {
     hardware: enc !== 'libx264',
   }
   send('ffmpeg:status', ffmpeg)
+
+  // Checked after the window is up, so a slow or offline network delays
+  // nothing the user is waiting on.
+  if (settings.autoCheckUpdates) void updater.check()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

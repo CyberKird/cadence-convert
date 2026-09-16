@@ -83,9 +83,41 @@ export interface FfmpegStatus {
   hardware: boolean
 }
 
+/** 'auto' keeps the startup probe's choice. Anything else forces that encoder. */
+export type EncoderChoice = 'auto' | VideoEncoder
+
+export type VideoEncoder = 'h264_nvenc' | 'h264_amf' | 'h264_qsv' | 'libx264'
+
+export const ENCODER_LABELS: Record<EncoderChoice, string> = {
+  auto: 'Automatic',
+  h264_nvenc: 'Nvidia NVENC',
+  h264_amf: 'AMD AMF',
+  h264_qsv: 'Intel QuickSync',
+  libx264: 'Processor',
+}
+
+export const AUDIO_BITRATES = [128, 192, 256, 320] as const
+
+export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error'
+
+export interface UpdateStatus {
+  state: UpdateState
+  /** The version waiting on GitHub, once one is known. */
+  version: string | null
+  /** 0 to 100 while downloading. */
+  percent: number
+  message: string | null
+}
+
 export interface AppSettings {
   theme: ThemeMode
   preset: Preset
   crf: number
   outputDir: string
+  encoder: EncoderChoice
+  audioBitrate: number
+  /** Holds off system sleep while a queue runs. Off risks a truncated file. */
+  keepAwake: boolean
+  animations: boolean
+  autoCheckUpdates: boolean
 }

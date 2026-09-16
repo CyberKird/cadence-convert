@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { access, rm, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
-import type { EncodeKind, MediaInfo } from '../shared/types'
+import type { EncodeKind, EncoderChoice, MediaInfo, VideoEncoder } from '../shared/types'
 
 /**
  * Candidate locations, in the order a Windows machine usually has them. The
@@ -69,7 +69,7 @@ export async function locate(): Promise<{ path: string | null; version: string |
   const { stdout } = await exec(ffmpegPath, ['-version'], 6000)
   const version = stdout.split('\n')[0]?.replace('ffmpeg version ', '').split(' ')[0] ?? null
 
-  encoder = await pickEncoder()
+  detected = await pickEncoder()
 
   return { path: ffmpegPath, version }
 }
@@ -134,15 +134,26 @@ export async function probe(path: string): Promise<MediaInfo> {
   }
 }
 
-export type VideoEncoder = 'h264_nvenc' | 'h264_amf' | 'h264_qsv' | 'libx264'
-
 /** Nvidia, then AMD, then Intel. Anything else falls back to the processor. */
 const HW_ENCODERS: VideoEncoder[] = ['h264_nvenc', 'h264_amf', 'h264_qsv']
 
-let encoder: VideoEncoder = 'libx264'
+/** What the startup probe found, before any user override. */
+let detected: VideoEncoder = 'libx264'
+let override: EncoderChoice = 'auto'
+let audioBitrate = 192
 
 export function activeEncoder(): VideoEncoder {
-  return encoder
+  return override === 'auto' ? detected : override
+}
+
+export function detectedEncoder(): VideoEncoder {
+  return detected
+}
+
+/** Settings the renderer owns, handed over before a queue runs. */
+export function configure(opts: { encoder: EncoderChoice; audioBitrate: number }): void {
+  override = opts.encoder
+  audioBitrate = opts.audioBitrate
 }
 
 /**
@@ -242,7 +253,7 @@ function argsFor(kind: EncodeKind, crf: number, input: string, output: string): 
     '-fps_mode',
     'cfr',
   ]
-  const audio = ['-c:a', 'aac', '-b:a', '192k']
+  const audio = ['-c:a', 'aac', '-b:a', `${audioBitrate}k`]
 
   if (kind === 'premiere') {
     // The editing copy goes to whichever encoder this machine actually has,
@@ -253,11 +264,12 @@ function argsFor(kind: EncodeKind, crf: number, input: string, output: string): 
     // 8 bit on purpose, even from a 10 bit camera. H.264 only carries 10 bit
     // as High 10, a profile with no hardware decoding that Premiere handles
     // badly, so the depth would cost more than it returns.
+    const enc = activeEncoder()
     return [
       ...common,
       '-c:v',
-      encoder,
-      ...qualityArgs(encoder, crf),
+      enc,
+      ...qualityArgs(enc, crf),
       '-pix_fmt',
       'yuv420p',
       ...audio,

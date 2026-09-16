@@ -98,6 +98,36 @@ export function MoonGlyph({ size = 15 }: { size?: number }) {
   )
 }
 
+export function GearGlyph({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden>
+      <circle cx="10" cy="10" r="2.6" {...stroke} />
+      <path
+        d="M10 2.6v1.7M10 15.7v1.7M17.4 10h-1.7M4.3 10H2.6M15.2 4.8l-1.2 1.2M6 14l-1.2 1.2M15.2 15.2L14 14M6 6L4.8 4.8"
+        {...stroke}
+      />
+    </svg>
+  )
+}
+
+export function DownloadGlyph({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden>
+      <path d="M10 3.5v8.5" {...stroke} />
+      <path d="M6.4 8.6L10 12.2l3.6-3.6" {...stroke} />
+      <path d="M4.2 15.2h11.6" {...stroke} />
+    </svg>
+  )
+}
+
+export function BackGlyph({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden>
+      <path d="M16 10H5M9.5 4.5L4 10l5.5 5.5" {...stroke} strokeWidth={1.8} />
+    </svg>
+  )
+}
+
 export function PowerGlyph({ size = 15 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden>

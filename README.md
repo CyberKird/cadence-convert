@@ -40,6 +40,15 @@ off when the queue is long and you are not. Windows holds the timer, so it
 still fires if the app is closed, and the machine is kept awake for the whole
 run so a half written file never happens.
 
+**Settings.** Encoder override when you would rather force one, quality, audio
+bitrate, output folder, sleep and animation behaviour, theme, and the update
+controls. Every value is revalidated on the way in, so a hand edited config
+file cannot push a bad argument at the encoder.
+
+**Updates.** New releases are noticed on launch and shown in Settings.
+Downloading is always a deliberate click, never automatic, because a hundred
+megabyte pull starting by itself on a metered connection is a bad surprise.
+
 ## Requirements
 
 ffmpeg and ffprobe, either on `PATH` or at `C:\ffmpeg\bin`. The app says so

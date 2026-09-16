@@ -8,6 +8,8 @@ import type {
   QueueFile,
   ShutdownStatus,
   ThemeMode,
+  UpdateStatus,
+  VideoEncoder,
 } from '../shared/types'
 
 /**
@@ -55,7 +57,21 @@ const api = {
   cancelShutdown: (): Promise<ShutdownStatus> => ipcRenderer.invoke('shutdown:cancel'),
   getShutdownStatus: (): Promise<ShutdownStatus> => ipcRenderer.invoke('shutdown:status'),
 
+  getUpdateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:status'),
+  checkUpdate: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:check'),
+  downloadUpdate: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:download'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (cb: (s: UpdateStatus) => void): (() => void) => {
+    const listener = (_e: unknown, s: UpdateStatus): void => cb(s)
+    ipcRenderer.on('update:status', listener)
+    return () => ipcRenderer.removeListener('update:status', listener)
+  },
+
+  getDetectedEncoder: (): Promise<VideoEncoder> => ipcRenderer.invoke('encoder:detected'),
+
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
+  updateSettings: (patch: Partial<AppSettings>): Promise<AppSettings> =>
+    ipcRenderer.invoke('settings:update', patch),
   setTheme: (mode: ThemeMode): Promise<AppSettings> => ipcRenderer.invoke('settings:setTheme', mode),
   setPreset: (preset: Preset): Promise<AppSettings> =>
     ipcRenderer.invoke('settings:setPreset', preset),
