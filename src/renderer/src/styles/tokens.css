@@ -1,0 +1,191 @@
+/*
+ * Cadence design tokens, carried over to the desktop.
+ *
+ * Monochrome only: black, white, and grey between. Colour is reserved for
+ * nothing. State is conveyed by fill and opacity, never by hue, which is what
+ * keeps a dense queue readable without turning into a traffic light.
+ *
+ * Light is the base. Dark redefines the same names, so no component branches.
+ */
+
+:root {
+  --bg: #e9e9ec;
+  --bg-wash-a: #ffffff;
+  --bg-wash-b: #c9c9d0;
+
+  --panel: rgb(255 255 255 / 0.62);
+  --panel-raised: rgb(252 252 253 / 0.94);
+  --panel-hover: rgb(255 255 255 / 0.78);
+  --panel-solid: #101013;
+  --panel-solid-text: #f4f4f6;
+
+  --hairline: rgb(255 255 255 / 0.7);
+  --hairline-out: rgb(16 16 19 / 0.08);
+
+  --text: #101013;
+  --text-dim: rgb(16 16 19 / 0.55);
+  --text-faint: rgb(16 16 19 / 0.34);
+
+  --track: rgb(16 16 19 / 0.1);
+
+  --shadow-glass: 0 1px 2px rgb(16 16 19 / 0.04), 0 8px 24px -8px rgb(16 16 19 / 0.12);
+  --shadow-lift: 0 2px 6px rgb(16 16 19 / 0.06), 0 20px 44px -12px rgb(16 16 19 / 0.22);
+
+  --radius-card: 22px;
+  --radius-panel: 30px;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Cascadia Code', 'SF Mono', Consolas, monospace;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --d-fast: 130ms;
+  --d-base: 240ms;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #08080a;
+  --bg-wash-a: #26262e;
+  --bg-wash-b: #000000;
+
+  --panel: rgb(255 255 255 / 0.055);
+  --panel-raised: rgb(28 28 33 / 0.92);
+  --panel-hover: rgb(255 255 255 / 0.095);
+  --panel-solid: #f4f4f6;
+  --panel-solid-text: #101013;
+
+  --hairline: rgb(255 255 255 / 0.1);
+  --hairline-out: rgb(0 0 0 / 0.5);
+
+  --text: #f4f4f6;
+  --text-dim: rgb(244 244 246 / 0.55);
+  --text-faint: rgb(244 244 246 / 0.32);
+
+  --track: rgb(244 244 246 / 0.12);
+
+  --shadow-glass: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -8px rgb(0 0 0 / 0.6);
+  --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5), 0 20px 44px -12px rgb(0 0 0 / 0.8);
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  /* The window chrome is the app's own. Selection everywhere would make it
+     read as a web page, so it is re-enabled per element where it helps. */
+  user-select: none;
+}
+
+/* Ambient wash sitting behind everything. Fixed, so nothing repaints it. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(52% 42% at 22% 12%, var(--bg-wash-a) 0%, transparent 62%),
+    radial-gradient(46% 46% at 82% 78%, var(--bg-wash-b) 0%, transparent 60%),
+    radial-gradient(38% 34% at 68% 8%, var(--bg-wash-a) 0%, transparent 55%);
+  filter: blur(28px) saturate(0);
+  opacity: 0.85;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-faint);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sheen {
+  to {
+    transform: translateX(240%);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Travels through the filled part of a progress row, so the bar keeps moving
+   even while the percentage sits still between two encoder reports. */
+@keyframes fill-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/*
+ * Motion is gated on an attribute that React stamps, never on the media query
+ * on its own. Windows reports "reduce" whenever its own animation effects are
+ * switched off, which people do for performance far more often than because
+ * motion bothers them, and a bare query leaves the whole app frozen with no
+ * way to say otherwise.
+ */
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
