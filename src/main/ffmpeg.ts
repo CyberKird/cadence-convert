@@ -4,12 +4,17 @@ import { constants } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import type { EncodeKind, EncoderChoice, MediaInfo, VideoEncoder } from '../shared/types'
 
+/** The installer carries its own copies, so a machine with neither on PATH works. */
+const bundled = (name: string): string => join(process.resourcesPath, 'ffmpeg', name)
+
 /**
  * Candidate locations, in the order a Windows machine usually has them. The
+ * bundled pair wins so a stale install elsewhere cannot take over, then the
  * plain names rely on PATH, which is where a winget or choco install lands.
+ * In development the bundled path does not exist and the spawn falls through.
  */
-const FFMPEG_CANDIDATES = ['ffmpeg', 'C:\\ffmpeg\\bin\\ffmpeg.exe']
-const FFPROBE_CANDIDATES = ['ffprobe', 'C:\\ffmpeg\\bin\\ffprobe.exe']
+const FFMPEG_CANDIDATES = [bundled('ffmpeg.exe'), 'ffmpeg', 'C:\\ffmpeg\\bin\\ffmpeg.exe']
+const FFPROBE_CANDIDATES = [bundled('ffprobe.exe'), 'ffprobe', 'C:\\ffmpeg\\bin\\ffprobe.exe']
 
 let ffmpegPath: string | null = null
 let ffprobePath: string | null = null

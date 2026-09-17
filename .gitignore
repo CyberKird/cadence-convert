@@ -4,3 +4,4 @@ release/
 dist/
 *.tsbuildinfo
 .DS_Store
+resources/ffmpeg/

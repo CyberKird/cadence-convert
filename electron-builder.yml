@@ -12,6 +12,14 @@ files:
 
 asar: true
 
+extraResources:
+  - from: resources/ffmpeg
+    to: ffmpeg
+    filter:
+      - ffmpeg.exe
+      - ffprobe.exe
+      - LICENSE.txt
+
 win:
   icon: build/icon.ico
   target:
