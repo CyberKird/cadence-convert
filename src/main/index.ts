@@ -13,6 +13,7 @@ import type {
   QueueFile,
   ThemeMode,
 } from '../shared/types'
+import { PRESETS } from '../shared/types'
 import {
   activeEncoder,
   configure,
@@ -180,7 +181,7 @@ function registerIpc(): void {
   ipcMain.handle('convert:start', async (_e, request: ConvertRequest): Promise<void> => {
     if (!ffmpeg.available) return
 
-    const stages: EncodeKind[] = [request.preset === 'shorts' ? 'shorts' : 'premiere']
+    const stages: EncodeKind[] = [PRESETS.includes(request.preset) ? request.preset : 'premiere']
     // Clamped here as well, because this becomes an ffmpeg argument.
     const crf = Math.min(30, Math.max(12, Math.round(request.crf)))
     const outputDir = typeof request.outputDir === 'string' ? request.outputDir : ''

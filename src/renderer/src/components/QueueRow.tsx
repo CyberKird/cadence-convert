@@ -1,5 +1,5 @@
 import type { JobProgress, Preset, QueueFile } from '../../../shared/types'
-import { shortsMbps, shortsSize } from '../../../shared/types'
+import { PROFILES, outputSize, targetMbps } from '../../../shared/types'
 import type { MessageKey } from '../../../shared/i18n'
 import { bytes, clock, codec, delta, duration, fps, resolution } from '../format'
 import { useI18n } from '../i18n'
@@ -12,12 +12,13 @@ const PROBE_ERRORS: Record<string, MessageKey> = {
   unreadable: 'row.errUnreadable',
 }
 
-/** Bytes the shorts copy should land near: video at its target plus audio. */
-export function shortsEstimate(file: QueueFile, audioKbps: number): number | null {
+/** Bytes a sized copy should land near: video at its target plus audio. */
+export function sizedEstimate(file: QueueFile, preset: Preset, audioKbps: number): number | null {
   const info = file.info
-  if (!info || !info.durationSec) return null
-  const mbps = shortsMbps(info.width, info.height, info.fps)
-  return ((mbps * 1_000_000 + audioKbps * 1000) * info.durationSec) / 8
+  if (preset === 'premiere' || !info || !info.durationSec) return null
+  const mbps = targetMbps(preset, info.width, info.height, info.fps)
+  const audio = PROFILES[preset].audioKbps ?? audioKbps
+  return ((mbps * 1_000_000 + audio * 1000) * info.durationSec) / 8
 }
 
 export function QueueRow({
@@ -186,10 +187,10 @@ function Plan({
 }) {
   const { t } = useI18n()
   const info = file.info!
-  if (preset === 'shorts') {
-    const out = shortsSize(info.width, info.height)
+  if (preset !== 'premiere') {
+    const out = outputSize(preset, info.width, info.height)
     const outFps = Math.min(info.fps, 60)
-    const est = shortsEstimate(file, audioKbps)
+    const est = sizedEstimate(file, preset, audioKbps)
     return (
       <>
         <span className="plan-main">
@@ -198,7 +199,7 @@ function Plan({
         <span className="plan-sub numeral">
           {busy
             ? t('row.waiting')
-            : `${shortsMbps(info.width, info.height, info.fps)} Mbps · ≈ ${bytes(est)}`}
+            : `${targetMbps(preset, info.width, info.height, info.fps)} Mbps · ≈ ${bytes(est)}`}
         </span>
       </>
     )

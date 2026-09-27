@@ -3,7 +3,7 @@ import { access, rm, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import type { EncodeKind, EncoderChoice, MediaInfo, VideoEncoder } from '../shared/types'
-import { SHORTS_MAX_EDGE, shortsMbps } from '../shared/types'
+import { PROFILES, targetMbps } from '../shared/types'
 
 /** The installer carries its own copies, so a machine with neither on PATH works. */
 const bundled = (name: string): string => join(process.resourcesPath, 'ffmpeg', name)
@@ -286,14 +286,17 @@ async function pickEncoder(): Promise<VideoEncoder> {
 }
 
 /** Bitrate targeted flags, for the one preset where size must be predictable. */
-function bitrateArgs(enc: VideoEncoder, mbps: number): string[] {
+function bitrateArgs(enc: VideoEncoder, mbps: number, peakCap: number | null): string[] {
+  // A platform's ceiling applies to the peak, so the buffer shrinks to one
+  // second of it and a busy scene cannot burst past the limit.
+  const peak = peakCap ? Math.min(Math.round(mbps * 1.5), peakCap) : Math.round(mbps * 1.5)
   const rate = [
     '-b:v',
     `${mbps}M`,
     '-maxrate',
-    `${Math.round(mbps * 1.5)}M`,
+    `${peak}M`,
     '-bufsize',
-    `${mbps * 2}M`,
+    `${peakCap ? peak : mbps * 2}M`,
   ]
   switch (enc) {
     case 'h264_nvenc':
@@ -335,7 +338,8 @@ export function argsFor(
   const audio = ['-c:a', 'aac', '-b:a', `${audioBitrate}k`]
   const enc = activeEncoder()
 
-  if (kind === 'shorts') {
+  if (kind !== 'premiere') {
+    const profile = PROFILES[kind]
     // 60 fps is the ceiling on every shorts platform, and 120 fps slow motion
     // would only double the decode load in CapCut.
     const fps = Math.min(info?.fps || 60, 60)
@@ -349,10 +353,14 @@ export function argsFor(
       '-fpsmax',
       '60',
       '-vf',
-      `scale=w='min(iw,${SHORTS_MAX_EDGE})':h='min(ih,${SHORTS_MAX_EDGE})':force_original_aspect_ratio=decrease:force_divisible_by=2,setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709`,
+      `scale=w='min(iw,${profile.maxEdge})':h='min(ih,${profile.maxEdge})':force_original_aspect_ratio=decrease:force_divisible_by=2,setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709`,
       '-c:v',
       enc,
-      ...bitrateArgs(enc, info ? shortsMbps(info.width, info.height, info.fps) : 45),
+      ...bitrateArgs(
+        enc,
+        info ? targetMbps(kind, info.width, info.height, info.fps) : profile.tiers[0].high,
+        profile.peakMbps,
+      ),
       '-profile:v',
       'high',
       // A keyframe every second keeps scrubbing and cutting in CapCut smooth,
@@ -365,7 +373,10 @@ export function argsFor(
       // add a zscale tonemap pass if that footage ever lands here.
       '-pix_fmt',
       'yuv420p',
-      ...audio,
+      '-c:a',
+      'aac',
+      '-b:a',
+      `${profile.audioKbps ?? audioBitrate}k`,
       '-ar',
       '48000',
       '-ac',
@@ -374,6 +385,9 @@ export function argsFor(
       // even with data streams dropped. Premiere uses it, CapCut does not.
       '-write_tmcd',
       '0',
+      // Instagram's spec asks for no edit lists, and the other platforms do
+      // not need one either, so timestamps are shifted to start at zero.
+      ...(kind === 'social' ? ['-use_editlist', '0'] : []),
       '-movflags',
       '+faststart',
       output,
@@ -410,7 +424,7 @@ export function argsFor(
 }
 
 export function outputPathFor(input: string, kind: EncodeKind, outputDir: string): string {
-  const suffix = kind === 'premiere' ? '_premiere' : '_shorts'
+  const suffix = `_${kind}`
   const dir = outputDir || dirname(input)
   return join(dir, `${basename(input, extname(input))}${suffix}.mp4`)
 }

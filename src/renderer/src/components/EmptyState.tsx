@@ -4,6 +4,7 @@ import { useI18n } from '../i18n'
 /**
  * The empty queue shows what the chosen preset actually does to a clip,
  * drawn as plain geometry: Shorts slides a 9:16 window across a 16:9 frame,
+ * Social fits a big 16:9 frame down to the size every platform takes, and
  * Premiere lines uneven camera frames up into an even cadence.
  */
 export function EmptyState({ preset, over, onPick }: { preset: Preset; over: boolean; onPick: () => void }) {
@@ -23,9 +24,20 @@ export function EmptyState({ preset, over, onPick }: { preset: Preset; over: boo
       }}
     >
       <div className="empty-art" key={preset}>
-        {preset === 'shorts' ? <ShortsArt /> : <PremiereArt />}
+        {preset === 'shorts' ? <ShortsArt /> : preset === 'social' ? <SocialArt /> : <PremiereArt />}
         <div className="empty-legend">
-          {preset === 'shorts' ? (
+          {preset === 'social' ? (
+            <>
+              <span className="legend-item">
+                <i className="legend-swatch" data-kind="frame" />
+                {t('empty.socialSource')}
+              </span>
+              <span className="legend-item">
+                <i className="legend-swatch" data-kind="crop" />
+                {t('empty.socialOut')}
+              </span>
+            </>
+          ) : preset === 'shorts' ? (
             <>
               <span className="legend-item">
                 <i className="legend-swatch" data-kind="frame" />
@@ -73,6 +85,18 @@ function ShortsArt() {
         <rect x="40" y="16" width="76" height="135" rx="7" className="art-crop" />
         <path d="M46 30v-8h8M110 30v-8h-8M46 137v8h8M110 137v8h-8" className="art-corner" />
       </g>
+    </svg>
+  )
+}
+
+function SocialArt() {
+  // The same 16:9 frame as Shorts, with the output box easing from full size
+  // down to half of it, the step from 4K to 1080p.
+  return (
+    <svg className="art" viewBox="0 0 320 170" width="320" height="170" aria-hidden>
+      <rect x="40" y="16" width="240" height="135" rx="11" className="art-frame" />
+      <path d="M120 16v135M200 16v135M40 61h240M40 106h240" className="art-guide" />
+      <rect x="40" y="16" width="240" height="135" rx="11" className="art-crop art-fit" />
     </svg>
   )
 }

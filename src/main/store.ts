@@ -4,6 +4,7 @@ import { app } from 'electron'
 import {
   AUDIO_BITRATES,
   LANGUAGE_CODES,
+  PRESETS,
   type AppSettings,
   type EncoderChoice,
   type Language,
@@ -25,8 +26,8 @@ const DEFAULTS: AppSettings = {
 }
 
 const THEMES: ThemeMode[] = ['light', 'dark', 'system']
-// A saved 'transfer' or 'both' from an older version falls back to premiere.
-const PRESETS: Preset[] = ['premiere', 'shorts']
+// A saved 'transfer' or 'both' from an older version falls back to premiere,
+// because PRESETS no longer lists them.
 const LANGUAGES: Language[] = ['system', ...LANGUAGE_CODES]
 const ENCODERS: EncoderChoice[] = ['auto', 'h264_nvenc', 'h264_amf', 'h264_qsv', 'libx264']
 

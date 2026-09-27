@@ -142,6 +142,17 @@
   }
 }
 
+@keyframes fit-down {
+  0%,
+  10% {
+    transform: scale(1);
+  }
+  90%,
+  100% {
+    transform: scale(0.5);
+  }
+}
+
 @keyframes playhead {
   from {
     transform: translateX(-6px);
@@ -1068,6 +1079,13 @@ h2 {
   animation: crop-slide 5.4s var(--ease-inout) infinite alternate;
 }
 
+.art-fit {
+  transform-box: fill-box;
+  transform-origin: center;
+  vector-effect: non-scaling-stroke;
+  animation: fit-down 5.4s var(--ease-inout) infinite alternate;
+}
+
 .art-cell {
   fill: var(--ink);
 }
@@ -1623,9 +1641,15 @@ h2 {
   transition: color 260ms var(--ease-out);
 }
 
+/* Equal columns that may wrap their subtitle, so three presets fit the
+   inspector in every language instead of pushing the last one out. */
 .seg[data-size='lg'] .seg-item {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: normal;
+  text-align: left;
   align-items: flex-start;
+  justify-content: flex-start;
   padding: 10px 13px;
   gap: 2px;
 }

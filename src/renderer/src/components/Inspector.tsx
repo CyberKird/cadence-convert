@@ -1,17 +1,19 @@
 import type { AppSettings, FfmpegStatus, JobProgress, Preset, QueueFile } from '../../../shared/types'
-import { ENCODER_LABELS, SHORTS_TIERS, shortsSize } from '../../../shared/types'
+import { ENCODER_LABELS, PROFILES, tierIndex } from '../../../shared/types'
+import type { SizedPreset } from '../../../shared/types'
 import { bytes, clock, duration } from '../format'
 import { useI18n } from '../i18n'
 import { Segmented, Slider } from './controls'
 import { ArrowGlyph, CheckGlyph, CloseGlyph, FolderGlyph } from './indicators'
-import { shortsEstimate } from './QueueRow'
+import { sizedEstimate } from './QueueRow'
 
-/** Which row of the shorts table a clip lands on, by the short edge of its output. */
-function tierOf(file: QueueFile): { tier: number; high: boolean } | null {
+/** Which row of the bitrate table a clip lands on, by the short edge of its output. */
+function tierOf(preset: SizedPreset, file: QueueFile): { tier: number; high: boolean } | null {
   if (!file.info) return null
-  const out = shortsSize(file.info.width, file.info.height)
-  const short = Math.min(out.width, out.height)
-  return { tier: short >= 1800 ? 0 : short >= 1300 ? 1 : 2, high: Math.min(file.info.fps, 60) > 30 }
+  return {
+    tier: tierIndex(preset, file.info.width, file.info.height),
+    high: Math.min(file.info.fps, 60) > 30,
+  }
 }
 
 export function Inspector({
@@ -48,10 +50,10 @@ export function Inspector({
   const valid = files.filter((f) => !f.error)
   const totalSec = valid.reduce((sum, f) => sum + (f.info?.durationSec ?? 0), 0)
   const inBytes = valid.reduce((sum, f) => sum + f.sizeBytes, 0)
-  const outBytes =
-    preset === 'shorts'
-      ? valid.reduce((sum, f) => sum + (shortsEstimate(f, settings.audioBitrate) ?? 0), 0)
-      : 0
+  const outBytes = valid.reduce(
+    (sum, f) => sum + (sizedEstimate(f, preset, settings.audioBitrate) ?? 0),
+    0,
+  )
 
   const states = valid.map((f) => jobs[f.id]?.state)
   const doneCount = states.filter((s) => s === 'done').length
@@ -74,7 +76,10 @@ export function Inspector({
   const left = runningJob?.speed ? (totalSec - encodedSec) / runningJob.speed : null
   const firstOutput = valid.map((f) => jobs[f.id]?.outputs[0]?.path).find(Boolean)
 
-  const tiersInQueue = valid.map(tierOf).filter((x): x is { tier: number; high: boolean } => !!x)
+  const tiersInQueue =
+    preset === 'premiere'
+      ? []
+      : valid.map((f) => tierOf(preset, f)).filter((x): x is { tier: number; high: boolean } => !!x)
   const encoderName =
     ffmpeg.videoEncoder === 'libx264'
       ? t('val.cpu')
@@ -85,13 +90,14 @@ export function Inspector({
       <div className="inspector-top">
         <Segmented<Preset>
           size="lg"
-          label={t('preset.premiere') + ' / ' + t('preset.shorts')}
+          label={[t('preset.premiere'), t('preset.shorts'), t('preset.social')].join(' / ')}
           value={preset}
           disabled={busy}
           onChange={onPreset}
           options={[
             { value: 'premiere', label: t('preset.premiere'), sub: t('preset.premiereTag') },
             { value: 'shorts', label: t('preset.shorts'), sub: t('preset.shortsTag') },
+            { value: 'social', label: t('preset.social'), sub: t('preset.socialTag') },
           ]}
         />
       </div>
@@ -100,17 +106,32 @@ export function Inspector({
       <div className="inspector-scroll">
         <div className="recipe" key={preset}>
           <p className="recipe-desc">
-            {preset === 'shorts' ? t('preset.shortsDesc') : t('preset.premiereDesc')}
+            {t(
+              preset === 'shorts'
+                ? 'preset.shortsDesc'
+                : preset === 'social'
+                  ? 'preset.socialDesc'
+                  : 'preset.premiereDesc',
+            )}
           </p>
 
           <dl className="specs">
-            {preset === 'shorts' ? (
+            {preset !== 'premiere' ? (
               <>
-                <Spec k={t('spec.frame')} v={t('val.frame')} />
+                <Spec
+                  k={t('spec.frame')}
+                  v={t(preset === 'social' ? 'val.frameSocial' : 'val.frame')}
+                />
                 <Spec k={t('spec.frameRate')} v={t('val.upTo60')} />
                 <Spec k={t('spec.codec')} v={t('val.h264High')} />
+                {preset === 'social' && <Spec k={t('spec.peak')} v={t('val.peak', { m: 25 })} />}
                 <Spec k={t('spec.keyframes')} v={t('val.everySecond')} />
-                <Spec k={t('spec.audio')} v={t('val.audioStereo', { k: settings.audioBitrate })} />
+                <Spec
+                  k={t('spec.audio')}
+                  v={t('val.audioStereo', {
+                    k: PROFILES[preset].audioKbps ?? settings.audioBitrate,
+                  })}
+                />
                 <Spec k={t('spec.madeFor')} v={t('val.platforms')} />
               </>
             ) : (
@@ -123,7 +144,7 @@ export function Inspector({
             )}
           </dl>
 
-          {preset === 'shorts' ? (
+          {preset !== 'premiere' ? (
             <div className="tiers">
               <div className="tiers-head">
                 <span>{t('tier.title')}</span>
@@ -142,7 +163,7 @@ export function Inspector({
                   </tr>
                 </thead>
                 <tbody>
-                  {SHORTS_TIERS.map((tier, i) => (
+                  {PROFILES[preset].tiers.map((tier, i) => (
                     <tr key={tier.label}>
                       <td>{tier.label}</td>
                       {[false, true].map((high) => (
@@ -213,7 +234,7 @@ export function Inspector({
             </span>
             <span className="summary-sizes">
               {t('summary.in', { size: bytes(inBytes) })}
-              {preset === 'shorts' && outBytes > 0 ? ` · ${t('summary.out', { size: bytes(outBytes) })}` : ''}
+              {preset !== 'premiere' && outBytes > 0 ? ` · ${t('summary.out', { size: bytes(outBytes) })}` : ''}
             </span>
           </div>
         )}

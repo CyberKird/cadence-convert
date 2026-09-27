@@ -41,6 +41,8 @@ const en = {
   'empty.sub': 'or click to browse. MP4, MOV, MKV and most camera formats.',
   'empty.shortsSource': '16:9 source, up to 4K',
   'empty.shortsCrop': '9:16 crop at 1080×1920',
+  'empty.socialSource': '16:9 source, any size',
+  'empty.socialOut': '16:9 at 1920×1080',
   'empty.premiereSource': 'Camera file, variable frame rate',
   'empty.premiereOut': 'Premiere copy, constant frame rate',
 
@@ -67,6 +69,10 @@ const en = {
   'preset.shortsTag': 'Prep for CapCut',
   'preset.shortsDesc':
     'The whole clip, ready for a shorts editor to cut vertical in CapCut. Stays 16:9, with enough resolution for a sharp 9:16 crop.',
+  'preset.social': 'Social',
+  'preset.socialTag': 'Upload as is',
+  'preset.socialDesc':
+    'The whole clip, still 16:9, at the best quality YouTube, TikTok and Instagram all accept. Upload the file as it comes out.',
 
   'spec.codec': 'Codec',
   'spec.frameRate': 'Frame rate',
@@ -75,11 +81,14 @@ const en = {
   'spec.frame': 'Frame',
   'spec.keyframes': 'Keyframes',
   'spec.madeFor': 'Made for',
+  'spec.peak': 'Peak rate',
   'val.h264': 'H.264, 8-bit 4:2:0',
   'val.h264High': 'H.264 High, 8-bit',
   'val.cfr': 'Constant, as source',
   'val.upTo60': 'As source, up to 60',
   'val.frame': '16:9 kept, up to 4K',
+  'val.frameSocial': '16:9 kept, up to 1080p',
+  'val.peak': 'Under {m} Mbps',
   'val.everySecond': 'Every second',
   'val.audioAll': 'AAC {k} kbps, all tracks',
   'val.audioStereo': 'AAC {k} kbps stereo',
@@ -212,6 +221,8 @@ const ro: Table = {
   'empty.sub': 'sau apasă ca să le alegi. MP4, MOV, MKV și majoritatea formatelor de cameră.',
   'empty.shortsSource': 'Sursă 16:9, până la 4K',
   'empty.shortsCrop': 'Decupaj 9:16 la 1080×1920',
+  'empty.socialSource': 'Sursă 16:9, orice mărime',
+  'empty.socialOut': '16:9 la 1920×1080',
   'empty.premiereSource': 'Fișier de cameră, cadre variabile',
   'empty.premiereOut': 'Copie Premiere, cadre constante',
 
@@ -242,6 +253,10 @@ const ro: Table = {
   'preset.shortsTag': 'Pregătit pentru CapCut',
   'preset.shortsDesc':
     'Clipul întreg, gata ca un editor de shorts să-l taie vertical în CapCut. Rămâne 16:9, cu destulă rezoluție pentru un decupaj 9:16 clar.',
+  'preset.social': 'Social',
+  'preset.socialTag': 'Urci direct',
+  'preset.socialDesc':
+    'Clipul întreg, tot 16:9, la cea mai bună calitate pe care o acceptă și YouTube, și TikTok, și Instagram. Urci fișierul exact cum iese.',
 
   'spec.codec': 'Codec',
   'spec.frameRate': 'Cadre/s',
@@ -250,11 +265,14 @@ const ro: Table = {
   'spec.frame': 'Cadru',
   'spec.keyframes': 'Keyframe-uri',
   'spec.madeFor': 'Pentru',
+  'spec.peak': 'Vârf',
   'val.h264': 'H.264, 8 biți 4:2:0',
   'val.h264High': 'H.264 High, 8 biți',
   'val.cfr': 'Constante, ca sursa',
   'val.upTo60': 'Ca sursa, maxim 60',
   'val.frame': '16:9 păstrat, până la 4K',
+  'val.frameSocial': '16:9 păstrat, până la 1080p',
+  'val.peak': 'Sub {m} Mbps',
   'val.everySecond': 'La fiecare secundă',
   'val.audioAll': 'AAC {k} kbps, toate pistele',
   'val.audioStereo': 'AAC {k} kbps stereo',
@@ -384,6 +402,8 @@ const de: Table = {
   'empty.sub': 'oder klicken zum Auswählen. MP4, MOV, MKV und die meisten Kameraformate.',
   'empty.shortsSource': '16:9-Quelle, bis 4K',
   'empty.shortsCrop': '9:16-Ausschnitt in 1080×1920',
+  'empty.socialSource': '16:9-Quelle, jede Größe',
+  'empty.socialOut': '16:9 in 1920×1080',
   'empty.premiereSource': 'Kameradatei, variable Bildrate',
   'empty.premiereOut': 'Premiere-Kopie, konstante Bildrate',
 
@@ -413,6 +433,10 @@ const de: Table = {
   'preset.shortsTag': 'Vorbereitet für CapCut',
   'preset.shortsDesc':
     'Der ganze Clip, bereit für einen Shorts-Editor, der in CapCut hochkant schneidet. Bleibt 16:9, mit genug Auflösung für einen scharfen 9:16-Ausschnitt.',
+  'preset.social': 'Social',
+  'preset.socialTag': 'Direkt hochladen',
+  'preset.socialDesc':
+    'Der ganze Clip, weiter in 16:9, in der besten Qualität, die YouTube, TikTok und Instagram alle annehmen. Die Datei so hochladen, wie sie herauskommt.',
 
   'spec.codec': 'Codec',
   'spec.frameRate': 'Bildrate',
@@ -421,11 +445,14 @@ const de: Table = {
   'spec.frame': 'Bild',
   'spec.keyframes': 'Keyframes',
   'spec.madeFor': 'Für',
+  'spec.peak': 'Spitzenrate',
   'val.h264': 'H.264, 8 Bit 4:2:0',
   'val.h264High': 'H.264 High, 8 Bit',
   'val.cfr': 'Konstant, wie Quelle',
   'val.upTo60': 'Wie Quelle, max. 60',
   'val.frame': '16:9 bleibt, bis 4K',
+  'val.frameSocial': '16:9 bleibt, bis 1080p',
+  'val.peak': 'Unter {m} Mbps',
   'val.everySecond': 'Jede Sekunde',
   'val.audioAll': 'AAC {k} kbps, alle Spuren',
   'val.audioStereo': 'AAC {k} kbps Stereo',
@@ -555,6 +582,8 @@ const fr: Table = {
   'empty.sub': 'ou cliquez pour parcourir. MP4, MOV, MKV et la plupart des formats caméra.',
   'empty.shortsSource': 'Source 16:9, jusqu’à 4K',
   'empty.shortsCrop': 'Recadrage 9:16 en 1080×1920',
+  'empty.socialSource': 'Source 16:9, toute taille',
+  'empty.socialOut': '16:9 en 1920×1080',
   'empty.premiereSource': 'Fichier caméra, cadence variable',
   'empty.premiereOut': 'Copie Premiere, cadence constante',
 
@@ -585,6 +614,10 @@ const fr: Table = {
   'preset.shortsTag': 'Préparé pour CapCut',
   'preset.shortsDesc':
     'Le clip entier, prêt à être recadré à la verticale dans CapCut par un monteur de shorts. Reste en 16:9, avec assez de résolution pour un recadrage 9:16 net.',
+  'preset.social': 'Social',
+  'preset.socialTag': 'À publier tel quel',
+  'preset.socialDesc':
+    'Le clip entier, toujours en 16:9, à la meilleure qualité que YouTube, TikTok et Instagram acceptent tous. Publiez le fichier tel quel.',
 
   'spec.codec': 'Codec',
   'spec.frameRate': 'Cadence',
@@ -593,11 +626,14 @@ const fr: Table = {
   'spec.frame': 'Cadre',
   'spec.keyframes': 'Images clés',
   'spec.madeFor': 'Pour',
+  'spec.peak': 'Débit crête',
   'val.h264': 'H.264, 8 bits 4:2:0',
   'val.h264High': 'H.264 High, 8 bits',
   'val.cfr': 'Constante, comme la source',
   'val.upTo60': 'Comme la source, 60 max.',
   'val.frame': '16:9 conservé, jusqu’à 4K',
+  'val.frameSocial': '16:9 conservé, jusqu’à 1080p',
+  'val.peak': 'Sous {m} Mbps',
   'val.everySecond': 'Chaque seconde',
   'val.audioAll': 'AAC {k} kbps, toutes les pistes',
   'val.audioStereo': 'AAC {k} kbps stéréo',
@@ -727,6 +763,8 @@ const es: Table = {
   'empty.sub': 'o haz clic para elegir. MP4, MOV, MKV y la mayoría de formatos de cámara.',
   'empty.shortsSource': 'Fuente 16:9, hasta 4K',
   'empty.shortsCrop': 'Recorte 9:16 a 1080×1920',
+  'empty.socialSource': 'Fuente 16:9, cualquier tamaño',
+  'empty.socialOut': '16:9 a 1920×1080',
   'empty.premiereSource': 'Archivo de cámara, fps variables',
   'empty.premiereOut': 'Copia para Premiere, fps constantes',
 
@@ -757,6 +795,10 @@ const es: Table = {
   'preset.shortsTag': 'Preparado para CapCut',
   'preset.shortsDesc':
     'El clip entero, listo para que un editor de shorts lo recorte en vertical en CapCut. Se queda en 16:9, con resolución de sobra para un recorte 9:16 nítido.',
+  'preset.social': 'Social',
+  'preset.socialTag': 'Súbelo tal cual',
+  'preset.socialDesc':
+    'El clip entero, sigue en 16:9, con la mejor calidad que aceptan a la vez YouTube, TikTok e Instagram. Sube el archivo tal como sale.',
 
   'spec.codec': 'Códec',
   'spec.frameRate': 'Fotogramas',
@@ -765,11 +807,14 @@ const es: Table = {
   'spec.frame': 'Encuadre',
   'spec.keyframes': 'Fotogramas clave',
   'spec.madeFor': 'Para',
+  'spec.peak': 'Pico',
   'val.h264': 'H.264, 8 bits 4:2:0',
   'val.h264High': 'H.264 High, 8 bits',
   'val.cfr': 'Constantes, como la fuente',
   'val.upTo60': 'Como la fuente, máx. 60',
   'val.frame': '16:9 intacto, hasta 4K',
+  'val.frameSocial': '16:9 intacto, hasta 1080p',
+  'val.peak': 'Menos de {m} Mbps',
   'val.everySecond': 'Cada segundo',
   'val.audioAll': 'AAC {k} kbps, todas las pistas',
   'val.audioStereo': 'AAC {k} kbps estéreo',
@@ -899,6 +944,8 @@ const it: Table = {
   'empty.sub': 'oppure fai clic per sceglierle. MP4, MOV, MKV e quasi tutti i formati da fotocamera.',
   'empty.shortsSource': 'Sorgente 16:9, fino a 4K',
   'empty.shortsCrop': 'Ritaglio 9:16 a 1080×1920',
+  'empty.socialSource': 'Sorgente 16:9, qualsiasi dimensione',
+  'empty.socialOut': '16:9 a 1920×1080',
   'empty.premiereSource': 'File di camera, fps variabili',
   'empty.premiereOut': 'Copia per Premiere, fps costanti',
 
@@ -929,6 +976,10 @@ const it: Table = {
   'preset.shortsTag': 'Pronto per CapCut',
   'preset.shortsDesc':
     'La clip intera, pronta perché un editor di shorts la tagli in verticale su CapCut. Resta in 16:9, con risoluzione sufficiente per un ritaglio 9:16 nitido.',
+  'preset.social': 'Social',
+  'preset.socialTag': 'Da caricare così',
+  'preset.socialDesc':
+    'La clip intera, sempre in 16:9, alla qualità più alta che YouTube, TikTok e Instagram accettano tutti. Carica il file così com’è.',
 
   'spec.codec': 'Codec',
   'spec.frameRate': 'Fotogrammi',
@@ -937,11 +988,14 @@ const it: Table = {
   'spec.frame': 'Inquadratura',
   'spec.keyframes': 'Keyframe',
   'spec.madeFor': 'Per',
+  'spec.peak': 'Picco',
   'val.h264': 'H.264, 8 bit 4:2:0',
   'val.h264High': 'H.264 High, 8 bit',
   'val.cfr': 'Costanti, come la sorgente',
   'val.upTo60': 'Come la sorgente, max 60',
   'val.frame': '16:9 mantenuto, fino a 4K',
+  'val.frameSocial': '16:9 mantenuto, fino a 1080p',
+  'val.peak': 'Sotto {m} Mbps',
   'val.everySecond': 'Ogni secondo',
   'val.audioAll': 'AAC {k} kbps, tutte le tracce',
   'val.audioStereo': 'AAC {k} kbps stereo',

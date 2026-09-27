@@ -8,8 +8,11 @@ export type Language = 'system' | LanguageCode
 /**
  * premiere: H.264 at constant quality, the pair Premiere never argues with.
  * shorts: the whole clip, still 16:9, prepared for a shorts editor in CapCut.
+ * social: the whole clip, still 16:9, inside the limits of every platform so
+ * it uploads as is to YouTube, TikTok and Instagram.
  */
-export type Preset = 'premiere' | 'shorts'
+export type Preset = 'premiere' | 'shorts' | 'social'
+export const PRESETS: readonly Preset[] = ['premiere', 'shorts', 'social']
 
 /** One preset writes one file, so the two names mean the same thing. */
 export type EncodeKind = Preset
@@ -127,39 +130,85 @@ export interface AppSettings {
   language: Language
 }
 
-/**
- * The shorts copy is capped at 4K. A 9:16 frame cut from 16:9 is only 9/16 of
- * the width wide, so reaching the 1080x1920 every platform wants needs a
- * source at least 1920 tall. 4K clears that with room to reframe, anything
- * bigger is just weight in CapCut, and smaller sources are never upscaled.
- */
-export const SHORTS_MAX_EDGE = 3840
+/** Presets that scale to a size and encode to a bitrate target. */
+export type SizedPreset = Exclude<Preset, 'premiere'>
 
-/** Output size of the shorts copy: fitted inside a 3840 box, never enlarged. */
-export function shortsSize(width: number, height: number): { width: number; height: number } {
-  const scale = Math.min(1, SHORTS_MAX_EDGE / Math.max(width, height, 1))
+export interface BitrateTier {
+  label: string
+  /** Smallest short edge of the output that lands on this tier. */
+  minShort: number
+  /** Mbps up to 30 fps, and above it. */
+  low: number
+  high: number
+}
+
+export interface SizedProfile {
+  /** Longest edge of the output. Smaller sources are never enlarged. */
+  maxEdge: number
+  tiers: readonly BitrateTier[]
+  /** Hard ceiling on the peak rate, when a platform enforces one. */
+  peakMbps: number | null
+  /** Fixed audio rate, when a platform enforces one. Null follows settings. */
+  audioKbps: number | null
+}
+
+export const PROFILES: Record<SizedPreset, SizedProfile> = {
+  /**
+   * Capped at 4K. A 9:16 frame cut from 16:9 is only 9/16 of the width wide,
+   * so reaching the 1080x1920 every platform wants needs a source at least
+   * 1920 tall. 4K clears that with room to reframe. Rates sit at the top of
+   * YouTube's SDR upload recommendations (4K 35-45 / 53-68, 1440p 16 / 24);
+   * 1080p sits above YouTube's 8 / 12 because a crop out of it is enlarged.
+   * Tiers go by the short edge, so a 4096 wide DCI clip still counts as 4K.
+   */
+  shorts: {
+    maxEdge: 3840,
+    peakMbps: null,
+    audioKbps: null,
+    tiers: [
+      { label: '4K', minShort: 1800, low: 45, high: 68 },
+      { label: '1440p', minShort: 1300, low: 16, high: 24 },
+      { label: '1080p', minShort: 0, low: 12, high: 16 },
+    ],
+  },
+  /**
+   * The strictest of the three platforms sets every limit: Instagram's Reels
+   * spec takes at most 1920 horizontal pixels, 25 Mbps VBR, 60 fps and AAC
+   * at 128 kbps 48 kHz. TikTok (up to 4096 px) and YouTube accept all of it.
+   */
+  social: {
+    maxEdge: 1920,
+    peakMbps: 25,
+    audioKbps: 128,
+    tiers: [
+      { label: '1080p', minShort: 1000, low: 16, high: 20 },
+      { label: '720p', minShort: 0, low: 8, high: 10 },
+    ],
+  },
+}
+
+/** Output size: fitted inside the profile's box, never enlarged. */
+export function outputSize(
+  preset: SizedPreset,
+  width: number,
+  height: number,
+): { width: number; height: number } {
+  const scale = Math.min(1, PROFILES[preset].maxEdge / Math.max(width, height, 1))
   const even = (n: number): number => Math.max(2, Math.round((n * scale) / 2) * 2)
   return { width: even(width), height: even(height) }
 }
 
-/**
- * Target bitrate in Mbps by output size, at the top of YouTube's upload
- * recommendations for SDR (4K 35-45 / 53-68, 1440p 16 / 24). 1080p sits
- * above YouTube's 8 / 12 because a crop out of it is enlarged on export.
- * Tiers go by the short edge, so a 4096 wide DCI clip still counts as 4K.
- */
-export function shortsMbps(width: number, height: number, fps: number): number {
-  const out = shortsSize(width, height)
+/** Index into the profile's tiers that a clip of this size lands on. */
+export function tierIndex(preset: SizedPreset, width: number, height: number): number {
+  const out = outputSize(preset, width, height)
   const short = Math.min(out.width, out.height)
-  const high = Math.min(fps, 60) > 30
-  if (short >= 1800) return high ? 68 : 45
-  if (short >= 1300) return high ? 24 : 16
-  return high ? 16 : 12
+  const tiers = PROFILES[preset].tiers
+  const i = tiers.findIndex((t) => short >= t.minShort)
+  return i === -1 ? tiers.length - 1 : i
 }
 
-/** The tiers shortsMbps can land on, for the table the interface draws. */
-export const SHORTS_TIERS = [
-  { label: '4K', low: 45, high: 68 },
-  { label: '1440p', low: 16, high: 24 },
-  { label: '1080p', low: 12, high: 16 },
-] as const
+/** Target bitrate in Mbps for a clip of this size and frame rate. */
+export function targetMbps(preset: SizedPreset, width: number, height: number, fps: number): number {
+  const tier = PROFILES[preset].tiers[tierIndex(preset, width, height)]
+  return Math.min(fps, 60) > 30 ? tier.high : tier.low
+}
