@@ -202,7 +202,7 @@
 /* --- Surfaces ------------------------------------------------------------ */
 
 .glass {
-  background: var(--surface);
+  background: linear-gradient(155deg, var(--glass-lit) 0%, var(--glass-shade) 62%, var(--glass-shade) 100%);
   backdrop-filter: blur(28px) saturate(1.2);
   box-shadow: var(--shadow-panel);
   border-radius: var(--r-panel);
@@ -460,10 +460,11 @@
   transform: rotate(-24deg) scale(1.08);
 }
 
+/* Sits in the button's corner, clear of the cog, always in ink. */
 .badge {
   position: absolute;
-  top: 5px;
-  right: 5px;
+  top: 2px;
+  right: 2px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -472,10 +473,7 @@
   animation: pulse 1.8s var(--ease-inout) infinite;
 }
 
-.icon-btn[data-active='true'] .badge {
-  background: var(--on-solid);
-  box-shadow: 0 0 0 2px var(--solid);
-}
+
 
 /* --- Tooltips ------------------------------------------------------------ */
 
@@ -1933,6 +1931,22 @@ h2 {
   user-select: text;
 }
 
+.settings-detail {
+  margin-top: 4px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--ink-2);
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
 .row-control {
   display: flex;
   align-items: center;
@@ -2045,4 +2059,59 @@ h2 {
   color: var(--on-solid);
   box-shadow: var(--shadow-solid);
   animation: bob 1.8s var(--ease-inout) infinite;
+}
+
+/* --- Short windows ------------------------------------------------------- */
+
+/* Below about 720px of height the pinned foot gives some of its room back to
+   the recipe, so the spec list and the bitrate table still have space to
+   scroll at the minimum window size. */
+@media (max-height: 720px) {
+  .inspector-foot {
+    gap: 8px;
+    padding-block: 10px 12px;
+  }
+
+  .output-label {
+    display: none;
+  }
+
+  .output-btn {
+    height: 34px;
+  }
+
+  .summary {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 8px;
+  }
+
+  .btn-go {
+    height: 44px;
+  }
+
+  .finish {
+    gap: 8px;
+  }
+
+  .finish-head {
+    font-size: 14px;
+  }
+
+  .finish-mark {
+    width: 24px;
+    height: 24px;
+  }
+
+  .finish-actions .btn {
+    height: 34px;
+  }
+
+  .spec {
+    padding-block: 6px;
+  }
+
+  .recipe {
+    gap: 10px;
+  }
 }

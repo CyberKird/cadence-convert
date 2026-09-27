@@ -183,7 +183,12 @@ export function Settings({
                 onChange={(autoCheckUpdates) => onPatch({ autoCheckUpdates })}
               />
             </Row>
-            <Row label={t('set.status')} hint={updateText(update, t)} live>
+            <Row
+              label={t('set.status')}
+              hint={updateText(update, t)}
+              detail={update.state === 'error' ? firstLine(update.message) : undefined}
+              live
+            >
               <div className="row-control">
                 {update.state === 'checking' && <Spinner size={16} />}
                 {update.state === 'downloading' && (
@@ -203,6 +208,11 @@ export function Settings({
                     {t('upd.install')}
                   </button>
                 )}
+                {update.state === 'error' && (
+                  <button className="btn btn-quiet btn-sm" onClick={() => window.open(RELEASES_URL)}>
+                    {t('upd.releases')}
+                  </button>
+                )}
                 {(update.state === 'idle' || update.state === 'error') && (
                   <button className="btn btn-outline btn-sm" onClick={onCheckUpdate}>
                     {update.message === 'latest' && <CheckGlyph size={14} />}
@@ -215,7 +225,7 @@ export function Settings({
 
           <Section title={t('sec.system')} index={5}>
             <Row label={t('set.ffmpeg')} hint={ffmpeg.path ?? undefined}>
-              <span className="numeral control-value">{ffmpeg.version ?? t('set.ffmpegMissing')}</span>
+              <span className="control-value">{ffmpeg.version ?? t('set.ffmpegMissing')}</span>
             </Row>
             <Row label={t('set.active')} hint={t('set.activeHint')}>
               <span className="tag tag-lg">{encoderLabel(ffmpeg.videoEncoder)}</span>
@@ -225,6 +235,13 @@ export function Settings({
       </div>
     </section>
   )
+}
+
+const RELEASES_URL = 'https://github.com/CyberKird/cadence-convert/releases/latest'
+
+/** electron-updater errors can run to a stack trace; the first line is the part worth showing. */
+function firstLine(message: string | null): string | undefined {
+  return message ? message.split('\n')[0].slice(0, 220) : undefined
 }
 
 /** Remembered between the capture and the change, so the theme reveal knows where it began. */
@@ -240,9 +257,16 @@ function updateText(u: UpdateStatus, t: Translate): string {
       return t('upd.downloading', { p: u.percent })
     case 'ready':
       return t('upd.ready', { v: u.version ?? '' })
-    case 'error':
-      // electron-updater errors can run to a stack trace; the first line is the useful part.
-      return t('upd.error', { msg: (u.message ?? '').split('\n')[0].slice(0, 160) })
+    case 'error': {
+      // Plain words and a next step first; the raw detail sits underneath.
+      const raw = u.message ?? ''
+      if (
+        /ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|ECONNREFUSED|net::ERR|getaddrinfo|socket hang up/i.test(raw)
+      )
+        return t('upd.errNetwork')
+      if (/\b404\b|Cannot find latest|No published versions/i.test(raw)) return t('upd.errNoRelease')
+      return t('upd.error')
+    }
     default:
       return u.message === 'latest' ? t('upd.latest') : u.message === 'dev' ? t('upd.dev') : t('upd.idle')
   }
@@ -260,11 +284,14 @@ function Section({ title, index, children }: { title: string; index: number; chi
 function Row({
   label,
   hint,
+  detail,
   live,
   children,
 }: {
   label: string
   hint?: string
+  /** A raw technical line under the hint, selectable so it can be copied into a report. */
+  detail?: string
   live?: boolean
   children: ReactNode
 }) {
@@ -275,6 +302,11 @@ function Row({
         {hint && (
           <span className="settings-hint" aria-live={live ? 'polite' : undefined}>
             {hint}
+          </span>
+        )}
+        {detail && (
+          <span className="settings-detail" title={detail}>
+            {detail}
           </span>
         )}
       </div>

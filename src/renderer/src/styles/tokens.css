@@ -15,9 +15,14 @@
   --wash-b: #c2c2cc;
 
   --surface: rgb(255 255 255 / 0.46);
+  /* Glass panels fall from a lit corner to a shaded one, so they read as a
+     pane catching light rather than a flat grey slab. */
+  --glass-lit: rgb(255 255 255 / 0.74);
+  --glass-shade: rgb(255 255 255 / 0.26);
   --surface-2: rgb(255 255 255 / 0.55);
   --surface-hover: rgb(255 255 255 / 0.92);
-  --surface-pop: rgb(250 250 251 / 0.97);
+  /* Opaque: a menu over a busy queue must not show the text beneath it. */
+  --surface-pop: #fafafb;
   --sunken: rgb(17 17 20 / 0.045);
 
   --ink: #111114;
@@ -62,9 +67,11 @@
   --wash-b: #000000;
 
   --surface: rgb(255 255 255 / 0.04);
+  --glass-lit: rgb(255 255 255 / 0.095);
+  --glass-shade: rgb(255 255 255 / 0.018);
   --surface-2: rgb(255 255 255 / 0.05);
   --surface-hover: rgb(255 255 255 / 0.08);
-  --surface-pop: rgb(27 27 32 / 0.97);
+  --surface-pop: #1b1b20;
   --sunken: rgb(0 0 0 / 0.28);
 
   --ink: #efeff2;
