@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-27T15:00:00Z",
+  "title": "Design System: Cadence Convert",
+  "extensions": {
+    "colorMeta": {
+      "ground-light": { "role": "neutral", "displayName": "Light Ground", "canonical": "#ececef" },
+      "ground-dark": { "role": "neutral", "displayName": "Dark Ground", "canonical": "#09090b" },
+      "ink-light": { "role": "neutral", "displayName": "Ink", "canonical": "#111114" },
+      "ink-dark": { "role": "neutral", "displayName": "Night Ink", "canonical": "#efeff2" },
+      "solid-light": { "role": "primary", "displayName": "Solid", "canonical": "#111114" },
+      "solid-dark": { "role": "primary", "displayName": "Night Solid", "canonical": "#efeff2" }
+    },
+    "shadows": [
+      { "name": "shadow-panel", "value": "inset 0 1px 0 var(--highlight), 0 1px 2px rgb(17 17 20 / 0.04), 0 22px 44px -26px rgb(17 17 20 / 0.3)", "purpose": "Glass panels." },
+      { "name": "shadow-pop", "value": "inset 0 1px 0 var(--highlight), 0 6px 16px -6px rgb(17 17 20 / 0.14), 0 34px 70px -22px rgb(17 17 20 / 0.38)", "purpose": "Popovers and menus." },
+      { "name": "shadow-solid", "value": "0 1px 1px rgb(17 17 20 / 0.14), 0 10px 22px -10px rgb(17 17 20 / 0.55)", "purpose": "Solid buttons, pills, active controls." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Arrivals: rows, panels, popovers, view changes." },
+      { "name": "ease-in", "value": "cubic-bezier(0.5, 0, 0.75, 0)", "purpose": "Departures: removed rows, the outgoing view." },
+      { "name": "ease-spring", "value": "cubic-bezier(0.3, 1.22, 0.6, 1)", "purpose": "Physical parts only: switch pill, toggle knob, button press." },
+      { "name": "ease-inout", "value": "cubic-bezier(0.65, 0, 0.35, 1)", "purpose": "Loops: sweeps, the empty-state diagrams." }
+    ],
+    "breakpoints": [{ "name": "window-min", "value": "940px" }]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one solid action in a region.",
+      "html": "<button class=\"ds-btn-primary\">Show files</button>",
+      "css": ".ds-btn-primary { height: 38px; padding: 0 16px; border: none; border-radius: 11px; background: var(--solid, #111114); color: var(--on-solid, #f6f6f8); font: 600 13px/1 'Inter Variable', system-ui, sans-serif; box-shadow: 0 1px 1px rgb(17 17 20 / .14), 0 10px 22px -10px rgb(17 17 20 / .55); transition: transform 380ms cubic-bezier(0.3, 1.22, 0.6, 1); cursor: pointer; } .ds-btn-primary:hover { transform: translateY(-1px); } .ds-btn-primary:active { transform: scale(.965); } .ds-btn-primary:focus-visible { outline: 2px solid #111114; outline-offset: 2px; }"
+    },
+    {
+      "name": "Preset Switch",
+      "kind": "custom",
+      "refersTo": "preset-switch-active",
+      "description": "Two presets with a sliding solid pill.",
+      "html": "<div class=\"ds-seg\"><button class=\"ds-seg-item ds-on\"><b>Premiere</b><span>Edit-ready H.264</span></button><button class=\"ds-seg-item\"><b>Shorts</b><span>Prep for CapCut</span></button></div>",
+      "css": ".ds-seg { display: flex; padding: 3px; border-radius: 12px; background: rgb(17 17 20 / .045); box-shadow: inset 0 0 0 1px rgb(17 17 20 / .075); font-family: 'Inter Variable', system-ui, sans-serif; } .ds-seg-item { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 13px; border: none; border-radius: 9px; background: none; color: rgb(17 17 20 / .64); cursor: pointer; } .ds-seg-item b { font-size: 14px; font-weight: 640; } .ds-seg-item span { font-size: 11.5px; } .ds-seg-item.ds-on { background: #111114; color: #f6f6f8; } .ds-seg-item:hover { color: #111114; } .ds-seg-item.ds-on:hover { color: #f6f6f8; }"
+    },
+    {
+      "name": "Tag",
+      "kind": "chip",
+      "description": "Outline marker such as Variable fps.",
+      "html": "<span class=\"ds-tag\">Variable fps</span>",
+      "css": ".ds-tag { padding: 1px 7px; border-radius: 99px; box-shadow: inset 0 0 0 1px rgb(17 17 20 / .14); color: #111114; font: 620 10.5px/1.6 'Inter Variable', system-ui, sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Cadence family, made precise",
+    "overview": "Monochrome glass over a static wash. Colour belongs to the footage; the app draws only ink, white and the greys between. Every screen says what will happen before it happens.",
+    "keyCharacteristics": ["Monochrome with a single solid per region", "Real thumbnails that take colour on hover", "Rich motion, gated only by the app's own switch"],
+    "rules": [
+      { "name": "The Footage Rule", "body": "The only hue on screen is the footage.", "section": "colors" },
+      { "name": "The One Solid Rule", "body": "A region carries at most one solid element at rest.", "section": "colors" }
+    ],
+    "dos": ["Show the output before the run", "Animate clip-path, transform, opacity, filter"],
+    "donts": ["Don't add hue for state", "Don't use --ink-3 for text"]
+  }
+}
