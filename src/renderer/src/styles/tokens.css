@@ -1,72 +1,91 @@
 /*
  * Cadence design tokens, carried over to the desktop.
  *
- * Monochrome only: black, white, and grey between. Colour is reserved for
- * nothing. State is conveyed by fill and opacity, never by hue, which is what
- * keeps a dense queue readable without turning into a traffic light.
+ * Monochrome only: black, white, and grey between. Colour is reserved for the
+ * footage itself. State is conveyed by fill, weight and motion, never by hue,
+ * which is what keeps a dense queue readable without turning into a traffic
+ * light.
  *
  * Light is the base. Dark redefines the same names, so no component branches.
  */
 
 :root {
-  --bg: #e9e9ec;
-  --bg-wash-a: #ffffff;
-  --bg-wash-b: #c9c9d0;
+  --bg: #ececef;
+  --wash-a: #ffffff;
+  --wash-b: #c2c2cc;
 
-  --panel: rgb(255 255 255 / 0.62);
-  --panel-raised: rgb(252 252 253 / 0.94);
-  --panel-hover: rgb(255 255 255 / 0.78);
-  --panel-solid: #101013;
-  --panel-solid-text: #f4f4f6;
+  --surface: rgb(255 255 255 / 0.46);
+  --surface-2: rgb(255 255 255 / 0.55);
+  --surface-hover: rgb(255 255 255 / 0.92);
+  --surface-pop: rgb(250 250 251 / 0.97);
+  --sunken: rgb(17 17 20 / 0.045);
 
-  --hairline: rgb(255 255 255 / 0.7);
-  --hairline-out: rgb(16 16 19 / 0.08);
+  --ink: #111114;
+  --ink-2: rgb(17 17 20 / 0.64);
+  --ink-3: rgb(17 17 20 / 0.42);
+  --line: rgb(17 17 20 / 0.075);
+  --line-2: rgb(17 17 20 / 0.14);
 
-  --text: #101013;
-  --text-dim: rgb(16 16 19 / 0.55);
-  --text-faint: rgb(16 16 19 / 0.34);
+  --solid: #111114;
+  --on-solid: #f6f6f8;
+  --on-solid-2: rgb(246 246 248 / 0.66);
 
-  --track: rgb(16 16 19 / 0.1);
+  --track: rgb(17 17 20 / 0.085);
+  --fill: rgb(17 17 20 / 0.055);
+  --highlight: rgb(255 255 255 / 0.95);
 
-  --shadow-glass: 0 1px 2px rgb(16 16 19 / 0.04), 0 8px 24px -8px rgb(16 16 19 / 0.12);
-  --shadow-lift: 0 2px 6px rgb(16 16 19 / 0.06), 0 20px 44px -12px rgb(16 16 19 / 0.22);
+  --shadow-panel:
+    inset 0 1px 0 var(--highlight), 0 1px 2px rgb(17 17 20 / 0.04), 0 22px 44px -26px rgb(17 17 20 / 0.3);
+  --shadow-pop:
+    inset 0 1px 0 var(--highlight), 0 6px 16px -6px rgb(17 17 20 / 0.14), 0 34px 70px -22px rgb(17 17 20 / 0.38);
+  --shadow-solid: 0 1px 1px rgb(17 17 20 / 0.14), 0 10px 22px -10px rgb(17 17 20 / 0.55);
 
-  --radius-card: 22px;
-  --radius-panel: 30px;
+  --r-panel: 20px;
+  --r-row: 14px;
+  --r-ctl: 11px;
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
 
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
-  --d-fast: 130ms;
-  --d-base: 240ms;
+  /* Exponential out for arrivals. The small overshoot is kept for the few
+     things that behave like physical parts: the switch pill, knobs, presses. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
+  --ease-spring: cubic-bezier(0.3, 1.22, 0.6, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
 
   color-scheme: light;
 }
 
 :root[data-theme='dark'] {
-  --bg: #08080a;
-  --bg-wash-a: #26262e;
-  --bg-wash-b: #000000;
+  --bg: #09090b;
+  --wash-a: #30303b;
+  --wash-b: #000000;
 
-  --panel: rgb(255 255 255 / 0.055);
-  --panel-raised: rgb(28 28 33 / 0.92);
-  --panel-hover: rgb(255 255 255 / 0.095);
-  --panel-solid: #f4f4f6;
-  --panel-solid-text: #101013;
+  --surface: rgb(255 255 255 / 0.04);
+  --surface-2: rgb(255 255 255 / 0.05);
+  --surface-hover: rgb(255 255 255 / 0.08);
+  --surface-pop: rgb(27 27 32 / 0.97);
+  --sunken: rgb(0 0 0 / 0.28);
 
-  --hairline: rgb(255 255 255 / 0.1);
-  --hairline-out: rgb(0 0 0 / 0.5);
+  --ink: #efeff2;
+  --ink-2: rgb(239 239 242 / 0.64);
+  --ink-3: rgb(239 239 242 / 0.4);
+  --line: rgb(255 255 255 / 0.07);
+  --line-2: rgb(255 255 255 / 0.13);
 
-  --text: #f4f4f6;
-  --text-dim: rgb(244 244 246 / 0.55);
-  --text-faint: rgb(244 244 246 / 0.32);
+  --solid: #efeff2;
+  --on-solid: #111114;
+  --on-solid-2: rgb(17 17 20 / 0.62);
 
-  --track: rgb(244 244 246 / 0.12);
+  --track: rgb(255 255 255 / 0.1);
+  --fill: rgb(255 255 255 / 0.06);
+  --highlight: rgb(255 255 255 / 0.08);
 
-  --shadow-glass: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -8px rgb(0 0 0 / 0.6);
-  --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5), 0 20px 44px -12px rgb(0 0 0 / 0.8);
+  --shadow-panel:
+    inset 0 1px 0 var(--highlight), 0 1px 2px rgb(0 0 0 / 0.45), 0 22px 44px -24px rgb(0 0 0 / 0.8);
+  --shadow-pop:
+    inset 0 1px 0 var(--highlight), 0 6px 16px -6px rgb(0 0 0 / 0.5), 0 34px 70px -20px rgb(0 0 0 / 0.85);
+  --shadow-solid: 0 1px 1px rgb(0 0 0 / 0.3), 0 10px 24px -10px rgb(0 0 0 / 0.7);
 
   color-scheme: dark;
 }
@@ -75,7 +94,6 @@
 *::before,
 *::after {
   box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -85,32 +103,48 @@ body,
   margin: 0;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   background: var(--bg);
-  color: var(--text);
+  color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
+  /* cv05 tails the l and cv08 serifs the I, so l, I and 1 stay distinct in
+     file names, which is most of what this app shows. */
+  font-feature-settings: 'cv05' 1, 'cv08' 1;
+  font-size: 13px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   /* The window chrome is the app's own. Selection everywhere would make it
      read as a web page, so it is re-enabled per element where it helps. */
   user-select: none;
+  caret-color: var(--ink);
 }
 
-/* Ambient wash sitting behind everything. Fixed, so nothing repaints it. */
+/* Ambient wash behind everything. Fixed and static, so the glass above it
+   never has to re-blur a moving background while the GPU is encoding. */
 body::before {
   content: '';
   position: fixed;
   inset: -25%;
   z-index: -1;
   pointer-events: none;
+  /* Lit top left, shaded bottom right, both falling behind the panels
+     themselves so the glass has something to carry, not only the gutters. */
   background:
-    radial-gradient(52% 42% at 22% 12%, var(--bg-wash-a) 0%, transparent 62%),
-    radial-gradient(46% 46% at 82% 78%, var(--bg-wash-b) 0%, transparent 60%),
-    radial-gradient(38% 34% at 68% 8%, var(--bg-wash-a) 0%, transparent 55%);
-  filter: blur(28px) saturate(0);
-  opacity: 0.85;
+    radial-gradient(44% 46% at 30% 30%, var(--wash-a) 0%, transparent 70%),
+    radial-gradient(40% 46% at 72% 72%, var(--wash-b) 0%, transparent 68%),
+    radial-gradient(30% 30% at 76% 22%, var(--wash-a) 0%, transparent 60%);
+  filter: blur(30px) saturate(0);
+  opacity: 0.9;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--bg);
 }
 
 button {
@@ -119,73 +153,56 @@ button {
   border: none;
   background: none;
   cursor: pointer;
+  padding: 0;
+}
+
+input {
+  font: inherit;
 }
 
 :focus-visible {
-  outline: 2px solid var(--text);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
-  border-radius: 8px;
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--text-faint);
-  border: 3px solid transparent;
+  background: rgb(from var(--ink) r g b / 0.18);
+  border: 4px solid transparent;
   background-clip: content-box;
   border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(from var(--ink) r g b / 0.32);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.numeral {
+  font-variant-numeric: tabular-nums;
 }
 
-@keyframes sheen {
-  to {
-    transform: translateX(240%);
-  }
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Travels through the filled part of a progress row, so the bar keeps moving
-   even while the percentage sits still between two encoder reports. */
-@keyframes fill-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(100%);
-  }
+.spacer {
+  flex: 1;
 }
 
 /*
- * Motion is gated on an attribute that React stamps, never on the media query
- * on its own. Windows reports "reduce" whenever its own animation effects are
- * switched off, which people do for performance far more often than because
- * motion bothers them, and a bare query leaves the whole app frozen with no
- * way to say otherwise.
+ * Motion is gated on an attribute React stamps from the app's own setting,
+ * never on the media query. Windows reports "reduce" whenever its animation
+ * effects are off, which people do for performance far more often than
+ * because motion bothers them, so the app keeps its motion unless the
+ * Settings toggle says otherwise.
  */
 :root[data-motion='reduced'] *,
 :root[data-motion='reduced'] *::before,
 :root[data-motion='reduced'] *::after {
   animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
 }

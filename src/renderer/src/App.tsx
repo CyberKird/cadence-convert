@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import type {
   AppSettings,
   FfmpegStatus,
@@ -10,48 +11,18 @@ import type {
   UpdateStatus,
   VideoEncoder,
 } from '../../shared/types'
-import { BOTH_CRF } from '../../shared/types'
-import { countdown } from './format'
+import { resolveLanguage, translator } from '../../shared/i18n'
+import { duration } from './format'
+import { I18nContext, type I18n } from './i18n'
+import { EmptyState } from './components/EmptyState'
+import { Inspector } from './components/Inspector'
 import { QueueRow } from './components/QueueRow'
 import { Settings } from './components/Settings'
-import {
-  AlertGlyph,
-  ArrowGlyph,
-  BackGlyph,
-  FilmGlyph,
-  FolderGlyph,
-  GearGlyph,
-  MoonGlyph,
-  PlusGlyph,
-  PowerGlyph,
-  SunGlyph,
-} from './components/indicators'
+import { TitleBar } from './components/TitleBar'
+import { AlertGlyph, PlusGlyph } from './components/indicators'
 
-const PRESET_COPY: Record<Preset, { label: string; blurb: string; codec: string }> = {
-  premiere: {
-    label: 'Premiere',
-    blurb: 'H.264 at constant quality. The pair Premiere never argues with.',
-    codec: 'H.264',
-  },
-  transfer: {
-    label: 'Transfer',
-    blurb: 'HEVC. The same picture at roughly half the size, for upload and sending.',
-    codec: 'HEVC',
-  },
-  both: {
-    label: 'Both',
-    blurb: 'One pass for editing, one for sending. Two files per clip, pinned to 18.',
-    codec: 'H.264 + HEVC',
-  },
-}
-
-const PRESET_KEYS = Object.keys(PRESET_COPY) as Preset[]
-
-const UNITS = [
-  { key: 'h' as const, max: 23 },
-  { key: 'm' as const, max: 59 },
-  { key: 's' as const, max: 59 },
-]
+/** How long a removed row takes to fold away before it leaves the list. */
+const LEAVE_MS = 260
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null)
@@ -63,11 +34,13 @@ export function App() {
     hardware: false,
   })
   const [version, setVersion] = useState('')
+  const [locale, setLocale] = useState(navigator.language)
 
   const [files, setFiles] = useState<QueueFile[]>([])
   const [jobs, setJobs] = useState<Record<string, JobProgress>>({})
   const [busy, setBusy] = useState(false)
-  const [dragging, setDragging] = useState(false)
+  const [leaving, setLeaving] = useState<Set<string>>(new Set())
+  const [drag, setDrag] = useState<{ count: number } | null>(null)
 
   const [view, setView] = useState<'queue' | 'settings'>('queue')
   const [update, setUpdate] = useState<UpdateStatus>({
@@ -77,31 +50,38 @@ export function App() {
     message: null,
   })
   const [detected, setDetected] = useState<VideoEncoder | null>(null)
+  const [dark, setDark] = useState(false)
 
   const [shutdown, setShutdown] = useState<ShutdownStatus>({ armed: false, at: null })
-  const [showPower, setShowPower] = useState(false)
-  const [hms, setHms] = useState({ h: 1, m: 0, s: 0 })
   const [now, setNow] = useState(() => Date.now())
-
-  const segRef = useRef<HTMLDivElement>(null)
-  // Measured rather than assumed. The labels are different lengths, so equal
-  // thirds would size the pill wrong and clip the widest word.
-  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
 
   // Drag events fire for every child element, so a depth counter is what keeps
   // the veil from flickering as the pointer crosses the rows underneath.
   const dragDepth = useRef(0)
 
+  const applyTheme = useCallback((mode: ThemeMode) => {
+    const resolved =
+      mode === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : mode
+    document.documentElement.dataset.theme = resolved
+    setDark(resolved === 'dark')
+    void window.api.setChrome(resolved)
+  }, [])
+
+  const applyMotion = (animations: boolean): void => {
+    // Windows reports reduced motion whenever its own animation effects are
+    // off, which is a performance preference far more often than a motion
+    // one. The app follows its own setting rather than that media query.
+    document.documentElement.dataset.motion = animations ? 'full' : 'reduced'
+  }
+
   useEffect(() => {
     window.api.getSettings().then((s) => {
       setSettings(s)
       applyTheme(s.theme)
-      // Windows reports reduced motion whenever its own animation effects are
-      // off, which is a performance preference far more often than a motion
-      // one. The app follows its own setting rather than that media query.
-      document.documentElement.dataset.motion = s.animations ? 'full' : 'reduced'
+      applyMotion(s.animations)
     })
     window.api.getAppInfo().then((i) => setVersion(i.version))
+    window.api.getLocale().then((l) => l && setLocale(l))
     window.api.getFfmpegStatus().then(setFfmpeg)
     window.api.getShutdownStatus().then(setShutdown)
     window.api.getUpdateStatus().then(setUpdate)
@@ -111,14 +91,22 @@ export function App() {
     const offProgress = window.api.onProgress((p) => setJobs((prev) => ({ ...prev, [p.id]: p })))
     const offDone = window.api.onFinished(() => setBusy(false))
     const offUpdate = window.api.onUpdateStatus(setUpdate)
-
     return () => {
       offStatus()
       offProgress()
       offDone()
       offUpdate()
     }
-  }, [])
+  }, [applyTheme])
+
+  // A 'system' theme has to follow Windows while the app is open, not only at launch.
+  useEffect(() => {
+    if (settings?.theme !== 'system') return
+    const query = matchMedia('(prefers-color-scheme: dark)')
+    const onChange = (): void => applyTheme('system')
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [settings?.theme, applyTheme])
 
   // Ticks only while a timer is armed, so an idle window is never waking up
   // to redraw a clock nobody is watching.
@@ -128,392 +116,321 @@ export function App() {
     return () => clearInterval(id)
   }, [shutdown.armed])
 
-  useLayoutEffect(() => {
-    const root = segRef.current
-    if (!root) return
+  const i18n = useMemo<I18n>(() => {
+    const systemLang = resolveLanguage('system', locale)
+    const lang = resolveLanguage(settings?.language ?? 'system', locale)
+    return { t: translator(lang), lang, systemLang }
+  }, [settings?.language, locale])
 
-    const measure = (): void => {
-      const active = root.querySelector<HTMLElement>('[data-active="true"]')
-      if (!active) return
-      const rootBox = root.getBoundingClientRect()
-      const box = active.getBoundingClientRect()
-      setIndicator({ left: box.left - rootBox.left, width: box.width })
-    }
+  useEffect(() => {
+    document.documentElement.lang = i18n.lang
+  }, [i18n.lang])
 
-    measure()
-    // Label widths move when the window resizes or when Inter finishes
-    // loading and the fallback font stops standing in for it.
-    const observer = new ResizeObserver(measure)
-    observer.observe(root)
-    return () => observer.disconnect()
-  }, [settings?.preset])
+  /**
+   * Wraps a state change in a view transition when motion is on. flushSync
+   * makes React commit inside the callback, so the browser snapshots the real
+   * after state rather than the one before it.
+   */
+  const transition = useCallback(
+    (kind: 'view' | 'theme', change: () => void, origin?: HTMLElement | null) => {
+      const root = document.documentElement
+      if (root.dataset.motion === 'reduced' || !document.startViewTransition) {
+        change()
+        return
+      }
+      root.dataset.vt = kind
+      const vt = document.startViewTransition(() => flushSync(change))
+      if (kind === 'theme' && origin) {
+        const box = origin.getBoundingClientRect()
+        const x = box.left + box.width / 2
+        const y = box.top + box.height / 2
+        const r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y))
+        void vt.ready.then(() => {
+          root.animate(
+            { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
+            {
+              duration: 680,
+              easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+              pseudoElement: '::view-transition-new(root)',
+            },
+          )
+        })
+      }
+      void vt.finished.finally(() => delete root.dataset.vt)
+    },
+    [],
+  )
 
-  const patch = useCallback((next: AppSettings) => setSettings(next), [])
+  const patchSettings = useCallback(
+    (next: Partial<AppSettings>) => {
+      void window.api.updateSettings(next).then((saved) => {
+        setSettings(saved)
+        applyMotion(saved.animations)
+        if (next.theme) applyTheme(saved.theme)
+      })
+    },
+    [applyTheme],
+  )
 
-  /** One path for every settings change, so side effects cannot be forgotten. */
-  const patchSettings = useCallback((next: Partial<AppSettings>) => {
-    void window.api.updateSettings(next).then((saved) => {
-      setSettings(saved)
-      applyTheme(saved.theme)
-      document.documentElement.dataset.motion = saved.animations ? 'full' : 'reduced'
-    })
-  }, [])
+  const setTheme = useCallback(
+    (mode: ThemeMode, origin: HTMLElement | null) => {
+      transition('theme', () => applyTheme(mode), origin)
+      patchSettings({ theme: mode })
+    },
+    [transition, applyTheme, patchSettings],
+  )
 
-  const armSeconds = hms.h * 3600 + hms.m * 60 + hms.s
+  const toggleView = useCallback(() => {
+    transition('view', () => setView((v) => (v === 'settings' ? 'queue' : 'settings')))
+  }, [transition])
 
-  const addPaths = useCallback(async (paths: string[]) => {
-    const added = await window.api.addFiles(paths)
+  const merge = useCallback((added: QueueFile[]) => {
     if (added.length === 0) return
     setFiles((prev) => {
       const seen = new Set(prev.map((f) => f.path))
       return [...prev, ...added.filter((f) => !seen.has(f.path))]
     })
   }, [])
+
+  const pick = useCallback(async () => {
+    if (busy) return
+    merge(await window.api.pickFiles())
+  }, [busy, merge])
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
       dragDepth.current = 0
-      setDragging(false)
+      setDrag(null)
       if (busy) return
       const paths = Array.from(e.dataTransfer.files).map((f) => window.api.pathForFile(f))
-      void addPaths(paths.filter(Boolean))
+      if (view === 'settings') transition('view', () => setView('queue'))
+      void window.api.addFiles(paths.filter(Boolean)).then(merge)
     },
-    [addPaths, busy],
+    [busy, merge, view, transition],
   )
 
-  const pick = useCallback(async () => {
-    const added = await window.api.pickFiles()
-    if (added.length === 0) return
-    setFiles((prev) => {
-      const seen = new Set(prev.map((f) => f.path))
-      return [...prev, ...added.filter((f) => !seen.has(f.path))]
-    })
+  /** Rows fold away before they leave, unless motion is reduced. */
+  const removeFiles = useCallback((ids: string[]) => {
+    if (ids.length === 0) return
+    const drop = (): void => {
+      setFiles((prev) => prev.filter((f) => !ids.includes(f.id)))
+      setJobs((prev) => {
+        const next = { ...prev }
+        for (const id of ids) delete next[id]
+        return next
+      })
+      setLeaving((prev) => {
+        const next = new Set(prev)
+        for (const id of ids) next.delete(id)
+        return next
+      })
+    }
+    if (document.documentElement.dataset.motion === 'reduced') {
+      drop()
+      return
+    }
+    setLeaving((prev) => new Set([...prev, ...ids]))
+    setTimeout(drop, LEAVE_MS)
   }, [])
 
   const start = useCallback(async () => {
-    if (!settings || files.length === 0) return
+    if (!settings) return
+    // Finished clips are not encoded twice when more are added afterwards.
+    const targets = files.filter((f) => !f.error && jobs[f.id]?.state !== 'done')
+    if (targets.length === 0) return
     setBusy(true)
-    setJobs({})
+    setJobs((prev) => {
+      const next = { ...prev }
+      for (const f of targets) delete next[f.id]
+      return next
+    })
     await window.api.startConvert({
-      files: files.map((f) => ({ id: f.id, path: f.path })),
+      files: targets.map((f) => ({ id: f.id, path: f.path })),
       preset: settings.preset,
       crf: settings.crf,
       outputDir: settings.outputDir,
     })
-  }, [files, settings])
+  }, [files, jobs, settings])
 
-  const pending = useMemo(() => files.filter((f) => !f.error).length, [files])
-  const finished = useMemo(
-    () => Object.values(jobs).filter((j) => j.state === 'done').length,
-    [jobs],
-  )
+  // Ctrl+O adds clips, Ctrl+, opens settings, Escape leaves them.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'o') {
+        e.preventDefault()
+        void pick()
+      } else if (e.ctrlKey && e.key === ',') {
+        e.preventDefault()
+        toggleView()
+      } else if (
+        e.key === 'Escape' &&
+        view === 'settings' &&
+        !document.querySelector('[aria-expanded="true"]')
+      ) {
+        toggleView()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pick, toggleView, view])
+
+  const valid = files.filter((f) => !f.error)
+  const totalSec = valid.reduce((s, f) => s + (f.info?.durationSec ?? 0), 0)
 
   if (!settings) return <div className="app" />
-
-  const preset = PRESET_COPY[settings.preset]
-  const dark = document.documentElement.dataset.theme === 'dark'
-  // 'both' owns its quality, so the slider stops being a control.
-  const locked = settings.preset === 'both'
+  const { t } = i18n
 
   return (
-    <div
-      className="app"
-      onDragEnter={(e) => {
-        e.preventDefault()
-        dragDepth.current += 1
-        if (!busy) setDragging(true)
-      }}
-      onDragOver={(e) => e.preventDefault()}
-      onDragLeave={() => {
-        dragDepth.current = Math.max(0, dragDepth.current - 1)
-        if (dragDepth.current === 0) setDragging(false)
-      }}
-      onDrop={onDrop}
-    >
-      <header className="header">
-        <div className="mark solid">CC</div>
-        <div className="header-meta">
-          <span className="header-title">Cadence Convert</span>
-          <span className="label">{version ? `v${version}` : 'video pipeline'}</span>
-        </div>
+    <I18nContext.Provider value={i18n}>
+      <div
+        className="app"
+        data-dragging={!!drag}
+        onDragEnter={(e) => {
+          e.preventDefault()
+          dragDepth.current += 1
+          if (!busy && !drag) setDrag({ count: e.dataTransfer.items.length })
+        }}
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={() => {
+          dragDepth.current = Math.max(0, dragDepth.current - 1)
+          if (dragDepth.current === 0) setDrag(null)
+        }}
+        onDrop={onDrop}
+      >
+        <TitleBar
+          version={version}
+          update={update}
+          shutdown={shutdown}
+          now={now}
+          dark={dark}
+          settingsOpen={view === 'settings'}
+          onTheme={(origin) => setTheme(dark ? 'light' : 'dark', origin)}
+          onSettings={toggleView}
+          onDownloadUpdate={() => void window.api.downloadUpdate().then(setUpdate)}
+          onInstallUpdate={() => void window.api.installUpdate()}
+          onArm={(seconds) => void window.api.armShutdown(seconds).then(setShutdown)}
+          onCancelShutdown={() => void window.api.cancelShutdown().then(setShutdown)}
+        />
 
-        <div className="spacer" />
+        {!ffmpeg.available && (
+          <div className="notice">
+            <AlertGlyph />
+            <span>{t('ffmpeg.missing')}</span>
+          </div>
+        )}
 
-        {view === 'queue' && (
-        <div className="segmented glass" ref={segRef}>
-          {indicator && (
-            <span
-              className="segment-indicator"
-              style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }}
-              aria-hidden
+        {view === 'settings' ? (
+          <main className="stage stage-settings">
+            <Settings
+              settings={settings}
+              ffmpeg={ffmpeg}
+              detected={detected}
+              update={update}
+              version={version}
+              onBack={toggleView}
+              onPatch={patchSettings}
+              onTheme={setTheme}
+              onPickFolder={async () => {
+                const dir = await window.api.pickOutputDir()
+                if (dir) patchSettings({ outputDir: dir })
+              }}
+              onCheckUpdate={() => void window.api.checkUpdate().then(setUpdate)}
+              onDownloadUpdate={() => void window.api.downloadUpdate().then(setUpdate)}
+              onInstallUpdate={() => void window.api.installUpdate()}
             />
-          )}
-          {PRESET_KEYS.map((key) => (
-            <button
-              key={key}
-              className="segment"
-              data-active={settings.preset === key}
-              disabled={busy}
-              onClick={() => window.api.setPreset(key).then(patch)}
-            >
-              {PRESET_COPY[key].label}
-            </button>
-          ))}
-        </div>
-        )}
+          </main>
+        ) : (
+          <main className="stage stage-queue">
+            <section className="queue glass">
+              <header className="queue-head">
+                <div className="queue-title">
+                  <h1>{t('queue.title')}</h1>
+                  {valid.length > 0 && (
+                    <span className="queue-count numeral">
+                      {t('queue.count', { n: valid.length })} · {duration(totalSec)}
+                    </span>
+                  )}
+                </div>
+                <div className="spacer" />
+                {files.length > 0 && !busy && (
+                  <>
+                    <button
+                      className="btn btn-quiet btn-sm"
+                      onClick={() => removeFiles(files.map((f) => f.id))}
+                    >
+                      {t('queue.clear')}
+                    </button>
+                    <button className="btn btn-outline btn-sm" onClick={pick}>
+                      <PlusGlyph size={14} />
+                      {t('queue.add')}
+                    </button>
+                  </>
+                )}
+              </header>
 
-        <button
-          className="icon-btn"
-          title={dark ? 'Light theme' : 'Dark theme'}
-          onClick={() => {
-            const next: ThemeMode = dark ? 'light' : 'dark'
-            applyTheme(next)
-            void window.api.setTheme(next).then(patch)
-          }}
-        >
-          {dark ? <SunGlyph /> : <MoonGlyph />}
-        </button>
-
-        <button
-          className="icon-btn"
-          data-active={shutdown.armed}
-          title="Scheduled shutdown"
-          onClick={() => setShowPower((open) => !open)}
-        >
-          <PowerGlyph />
-        </button>
-
-        <button
-          className="icon-btn"
-          data-active={view === 'settings' || update.state === 'available'}
-          title={view === 'settings' ? 'Back to the queue' : 'Settings'}
-          onClick={() => setView((v) => (v === 'settings' ? 'queue' : 'settings'))}
-        >
-          {view === 'settings' ? <BackGlyph /> : <GearGlyph />}
-        </button>
-      </header>
-
-      {!ffmpeg.available && (
-        <div className="notice glass">
-          <AlertGlyph />
-          <span>
-            ffmpeg was not found. Install it, or place it at C:\ffmpeg\bin, then restart the app.
-          </span>
-        </div>
-      )}
-
-      {showPower && (
-        <div className="power-bar glass">
-          {shutdown.armed && shutdown.at !== null ? (
-            <>
-              <span className="label">Shutting down in</span>
-              <span className="numeral power-count">{countdown(shutdown.at - now)}</span>
-              <div className="spacer" />
-              <button
-                className="btn btn-quiet"
-                onClick={() => void window.api.cancelShutdown().then(setShutdown)}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="label">Shut down after</span>
-              <div className="hms">
-                {UNITS.map(({ key, max }) => (
-                  <label key={key} className="hms-unit">
-                    <input
-                      className="hms-input numeral"
-                      type="number"
-                      min={0}
-                      max={max}
-                      value={hms[key]}
-                      onChange={(e) => {
-                        const v = Math.min(max, Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                        setHms((prev) => ({ ...prev, [key]: v }))
-                      }}
+              {files.length === 0 ? (
+                <EmptyState preset={settings.preset} over={!!drag} onPick={pick} />
+              ) : (
+                <div className="list">
+                  {files.map((file, i) => (
+                    <QueueRow
+                      key={file.id}
+                      file={file}
+                      job={jobs[file.id]}
+                      preset={settings.preset}
+                      audioKbps={settings.audioBitrate}
+                      busy={busy}
+                      index={i}
+                      leaving={leaving.has(file.id)}
+                      onRemove={(id) => removeFiles([id])}
+                      onReveal={(path) => void window.api.reveal(path)}
                     />
-                    <span className="label">{key}</span>
-                  </label>
-                ))}
-              </div>
-              <span className="label" style={{ color: 'var(--text-dim)' }}>
-                stays awake until then
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <Inspector
+              settings={settings}
+              ffmpeg={ffmpeg}
+              files={files}
+              jobs={jobs}
+              busy={busy}
+              onPreset={(preset: Preset) => void window.api.setPreset(preset).then(setSettings)}
+              onCrf={(crf) => {
+                setSettings({ ...settings, crf })
+                void window.api.setCrf(crf)
+              }}
+              onPickFolder={async () => {
+                const dir = await window.api.pickOutputDir()
+                if (dir) void window.api.setOutputDir(dir).then(setSettings)
+              }}
+              onResetFolder={() => patchSettings({ outputDir: '' })}
+              onStart={start}
+              onCancel={() => void window.api.cancelConvert()}
+              onReveal={(path) => void window.api.reveal(path)}
+              onClearDone={() =>
+                removeFiles(files.filter((f) => jobs[f.id]?.state === 'done').map((f) => f.id))
+              }
+            />
+          </main>
+        )}
+
+        {drag && (
+          <div className="veil" aria-hidden>
+            <span className="veil-corner" data-c="tl" />
+            <span className="veil-corner" data-c="tr" />
+            <span className="veil-corner" data-c="bl" />
+            <span className="veil-corner" data-c="br" />
+            <div className="veil-label">
+              <span className="veil-plus">
+                <PlusGlyph size={22} />
               </span>
-              <div className="spacer" />
-              <button
-                className="btn solid"
-                disabled={armSeconds === 0}
-                onClick={() => void window.api.armShutdown(armSeconds).then(setShutdown)}
-              >
-                Arm
-                <PowerGlyph size={14} />
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {view === 'settings' ? (
-        <section className="panel glass">
-          <Settings
-            settings={settings}
-            ffmpeg={ffmpeg}
-            detected={detected}
-            update={update}
-            version={version}
-            onPatch={patchSettings}
-            onPickFolder={async () => {
-              const dir = await window.api.pickOutputDir()
-              if (dir) patchSettings({ outputDir: dir })
-            }}
-            onCheckUpdate={() => void window.api.checkUpdate().then(setUpdate)}
-            onDownloadUpdate={() => void window.api.downloadUpdate().then(setUpdate)}
-            onInstallUpdate={() => void window.api.installUpdate()}
-          />
-        </section>
-      ) : (
-        <>
-      <section className="panel glass">
-        <div className="panel-head">
-          <span className="label">{preset.codec} queue</span>
-          {settings.preset !== 'transfer' && (
-            <span className="pill" title={ffmpeg.videoEncoder}>
-              {ffmpeg.hardware ? 'GPU' : 'CPU'}
-            </span>
-          )}
-          <span className="label numeral" style={{ color: 'var(--text-dim)' }}>
-            {busy ? `${finished} of ${pending}` : pending ? `${pending} file${pending > 1 ? 's' : ''}` : 'empty'}
-          </span>
-          <div className="spacer" />
-          {files.length > 0 && !busy && (
-            <>
-              <button className="btn btn-quiet" style={{ height: 30, padding: '0 12px' }} onClick={() => setFiles([])}>
-                Clear
-              </button>
-              <button className="btn btn-quiet" style={{ height: 30, padding: '0 12px' }} onClick={pick}>
-                <PlusGlyph />
-                Add
-              </button>
-            </>
-          )}
-        </div>
-
-        {files.length === 0 ? (
-          <div className="drop" data-over={dragging} onClick={pick} role="button" tabIndex={0}>
-            <div className="drop-inner">
-              <div style={{ color: 'var(--text-faint)', marginBottom: 6 }}>
-                <FilmGlyph size={28} />
-              </div>
-              <h2 style={{ fontSize: 15 }}>Drop clips here</h2>
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-dim)', maxWidth: 330 }}>
-                {preset.blurb}
-              </p>
+              <span>{drag.count > 0 ? t('veil.release', { n: drag.count }) : t('veil.generic')}</span>
             </div>
           </div>
-        ) : (
-          <div className="list">
-            {files.map((file, i) => (
-              <QueueRow
-                key={file.id}
-                file={file}
-                job={jobs[file.id]}
-                busy={busy}
-                index={i}
-                onRemove={(id) => setFiles((prev) => prev.filter((f) => f.id !== id))}
-                onReveal={(path) => void window.api.reveal(path)}
-              />
-            ))}
-          </div>
         )}
-      </section>
-
-      <footer className="bar glass">
-        <div className="field">
-          <span className="label">
-            Quality <span className="numeral">{locked ? BOTH_CRF : settings.crf}</span>
-            {locked ? ' fixed' : ''}
-          </span>
-          <input
-            className="slider"
-            type="range"
-            min={12}
-            max={30}
-            value={locked ? BOTH_CRF : settings.crf}
-            disabled={busy || locked}
-            onChange={(e) => {
-              const crf = Number(e.target.value)
-              setSettings({ ...settings, crf })
-              void window.api.setCrf(crf)
-            }}
-          />
-        </div>
-
-        <div className="field" style={{ minWidth: 0 }}>
-          <span className="label">Output</span>
-          <button
-            className="path-btn"
-            disabled={busy}
-            title={settings.outputDir || 'Beside each source file'}
-            onClick={async () => {
-              const dir = await window.api.pickOutputDir()
-              if (dir) void window.api.setOutputDir(dir).then(patch)
-            }}
-          >
-            <FolderGlyph size={12} />{' '}
-            {settings.outputDir ? shorten(settings.outputDir) : 'Next to source'}
-          </button>
-        </div>
-
-        <div className="spacer" />
-
-        {busy ? (
-          <button className="btn btn-quiet" onClick={() => void window.api.cancelConvert()}>
-            Cancel
-          </button>
-        ) : (
-          <button
-            className="btn solid"
-            style={{ position: 'relative', overflow: 'hidden' }}
-            disabled={pending === 0 || !ffmpeg.available}
-            onClick={start}
-          >
-            Convert {pending > 0 ? pending : ''}
-            <ArrowGlyph size={14} />
-          </button>
-        )}
-      </footer>
-        </>
-      )}
-
-      {dragging && (
-        <div className="drop-veil">
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: 'var(--text-faint)' }}>
-              <PlusGlyph size={30} />
-            </div>
-            <h2 style={{ fontSize: 15, marginTop: 8 }}>Add to queue</h2>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
+    </I18nContext.Provider>
   )
-}
-
-function applyTheme(mode: ThemeMode): void {
-  const resolved =
-    mode === 'system'
-      ? window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light'
-      : mode
-  document.documentElement.dataset.theme = resolved
-}
-
-/** Keeps the drive and the last folder, which is what identifies a path. */
-function shorten(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean)
-  if (parts.length <= 2) return path
-  return `${parts[0]}\\...\\${parts[parts.length - 1]}`
 }

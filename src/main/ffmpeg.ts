@@ -3,6 +3,7 @@ import { access, rm, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import type { EncodeKind, EncoderChoice, MediaInfo, VideoEncoder } from '../shared/types'
+import { SHORTS_MAX_EDGE, shortsMbps } from '../shared/types'
 
 /** The installer carries its own copies, so a machine with neither on PATH works. */
 const bundled = (name: string): string => join(process.resourcesPath, 'ffmpeg', name)
@@ -139,6 +140,56 @@ export async function probe(path: string): Promise<MediaInfo> {
   }
 }
 
+/**
+ * One early frame as a small JPEG data URI, so a queue row shows the actual
+ * shot instead of a file icon. Seeks before the input, which is a keyframe
+ * jump and costs a fraction of a second even on a 4K HEVC file. Anything that
+ * goes wrong returns null and the row simply draws without a picture.
+ */
+export function thumbnail(path: string, durationSec: number): Promise<string | null> {
+  if (!ffmpegPath) return Promise.resolve(null)
+  const at = durationSec > 4 ? Math.min(2, durationSec * 0.1) : 0
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = []
+    const child = spawn(
+      ffmpegPath as string,
+      [
+        '-v',
+        'error',
+        '-ss',
+        at.toFixed(2),
+        '-i',
+        path,
+        '-map',
+        '0:v:0',
+        '-frames:v',
+        '1',
+        '-vf',
+        'scale=240:-2',
+        '-q:v',
+        '5',
+        '-f',
+        'image2pipe',
+        '-c:v',
+        'mjpeg',
+        'pipe:1',
+      ],
+      { windowsHide: true },
+    )
+    const timer = setTimeout(() => child.kill(), 15000)
+    child.stdout.on('data', (d: Buffer) => chunks.push(d))
+    child.on('error', () => {
+      clearTimeout(timer)
+      resolve(null)
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      const jpeg = Buffer.concat(chunks)
+      resolve(code === 0 && jpeg.length > 0 ? `data:image/jpeg;base64,${jpeg.toString('base64')}` : null)
+    })
+  })
+}
+
 /** Nvidia, then AMD, then Intel. Anything else falls back to the processor. */
 const HW_ENCODERS: VideoEncoder[] = ['h264_nvenc', 'h264_amf', 'h264_qsv']
 
@@ -234,7 +285,35 @@ async function pickEncoder(): Promise<VideoEncoder> {
   return 'libx264'
 }
 
-function argsFor(kind: EncodeKind, crf: number, input: string, output: string): string[] {
+/** Bitrate targeted flags, for the one preset where size must be predictable. */
+function bitrateArgs(enc: VideoEncoder, mbps: number): string[] {
+  const rate = [
+    '-b:v',
+    `${mbps}M`,
+    '-maxrate',
+    `${Math.round(mbps * 1.5)}M`,
+    '-bufsize',
+    `${mbps * 2}M`,
+  ]
+  switch (enc) {
+    case 'h264_nvenc':
+      return ['-rc', 'vbr', ...rate, '-preset', 'p5', '-tune', 'hq']
+    case 'h264_amf':
+      return ['-rc', 'vbr_peak', ...rate, '-quality', 'quality']
+    case 'h264_qsv':
+      return [...rate, '-preset', 'medium']
+    case 'libx264':
+      return [...rate, '-preset', 'medium']
+  }
+}
+
+export function argsFor(
+  kind: EncodeKind,
+  crf: number,
+  input: string,
+  output: string,
+  info: MediaInfo | null,
+): string[] {
   const common = [
     '-y',
     // Progress as key=value lines on stdout, five times a second. ffmpeg's
@@ -248,60 +327,82 @@ function argsFor(kind: EncodeKind, crf: number, input: string, output: string): 
     input,
     // Camera files carry a tmcd timecode track that no mp4 encoder accepts,
     // and drone files add an mjpeg thumbnail that default mapping can mistake
-    // for the real picture, so both streams are named by hand. Every audio
-    // track is kept, not just the first, and the '?' lets a silent clip pass.
+    // for the real picture, so both streams are named by hand.
     '-map',
     '0:v:0',
-    '-map',
-    '0:a?',
-    '-dn',
-    '-fps_mode',
-    'cfr',
   ]
+  const tail = ['-dn', '-fps_mode', 'cfr']
   const audio = ['-c:a', 'aac', '-b:a', `${audioBitrate}k`]
+  const enc = activeEncoder()
 
-  if (kind === 'premiere') {
-    // The editing copy goes to whichever encoder this machine actually has,
-    // decided once at startup. It is an intermediate, so finishing in minutes
-    // beats shaving a few percent off the size, and it leaves the processor
-    // free for everything else.
-    //
-    // 8 bit on purpose, even from a 10 bit camera. H.264 only carries 10 bit
-    // as High 10, a profile with no hardware decoding that Premiere handles
-    // badly, so the depth would cost more than it returns.
-    const enc = activeEncoder()
+  if (kind === 'shorts') {
+    // 60 fps is the ceiling on every shorts platform, and 120 fps slow motion
+    // would only double the decode load in CapCut.
+    const fps = Math.min(info?.fps || 60, 60)
     return [
       ...common,
+      // CapCut and every platform read one stereo track, so a second mic
+      // track would just be dropped somewhere without saying so.
+      '-map',
+      '0:a:0?',
+      ...tail,
+      '-fpsmax',
+      '60',
+      '-vf',
+      `scale=w='min(iw,${SHORTS_MAX_EDGE})':h='min(ih,${SHORTS_MAX_EDGE})':force_original_aspect_ratio=decrease:force_divisible_by=2,setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709`,
       '-c:v',
       enc,
-      ...qualityArgs(enc, crf),
+      ...bitrateArgs(enc, info ? shortsMbps(info.width, info.height, info.fps) : 45),
+      '-profile:v',
+      'high',
+      // A keyframe every second keeps scrubbing and cutting in CapCut smooth,
+      // where camera files often go several seconds between them.
+      '-g',
+      String(Math.round(fps)),
+      // 8 bit SDR 4:2:0 tagged bt709 (in the filter above, since frame tags
+      // win over output flags) is what every platform ingests without a surprise.
+      // ponytail: HLG or log footage is not tone mapped and will look flat,
+      // add a zscale tonemap pass if that footage ever lands here.
       '-pix_fmt',
       'yuv420p',
       ...audio,
-      // faststart lets a player begin before the whole file is read, which
-      // also makes Premiere's first scrub feel immediate.
+      '-ar',
+      '48000',
+      '-ac',
+      '2',
+      // The mp4 muxer rebuilds a timecode track from the camera's metadata
+      // even with data streams dropped. Premiere uses it, CapCut does not.
+      '-write_tmcd',
+      '0',
       '-movflags',
       '+faststart',
       output,
     ]
   }
 
+  // The editing copy goes to whichever encoder this machine actually has,
+  // decided once at startup. It is an intermediate, so finishing in minutes
+  // beats shaving a few percent off the size, and it leaves the processor
+  // free for everything else.
+  //
+  // 8 bit on purpose, even from a 10 bit camera. H.264 only carries 10 bit
+  // as High 10, a profile with no hardware decoding that Premiere handles
+  // badly, so the depth would cost more than it returns.
   return [
     ...common,
+    // Every audio track is kept, not just the first, and the '?' lets a
+    // silent clip pass.
+    '-map',
+    '0:a?',
+    ...tail,
     '-c:v',
-    'libx265',
-    '-crf',
-    String(crf),
-    '-preset',
-    'slow',
-    // Without hvc1 the file plays in VLC but not in QuickTime or Premiere.
-    '-tag:v',
-    'hvc1',
-    // The copy meant for sending stays 8 bit on purpose. It has to open on
-    // any phone or TV, and the extra depth buys a viewer nothing.
+    enc,
+    ...qualityArgs(enc, crf),
     '-pix_fmt',
     'yuv420p',
     ...audio,
+    // faststart lets a player begin before the whole file is read, which
+    // also makes Premiere's first scrub feel immediate.
     '-movflags',
     '+faststart',
     output,
@@ -309,7 +410,7 @@ function argsFor(kind: EncodeKind, crf: number, input: string, output: string): 
 }
 
 export function outputPathFor(input: string, kind: EncodeKind, outputDir: string): string {
-  const suffix = kind === 'premiere' ? '_premiere' : '_compressed'
+  const suffix = kind === 'premiere' ? '_premiere' : '_shorts'
   const dir = outputDir || dirname(input)
   return join(dir, `${basename(input, extname(input))}${suffix}.mp4`)
 }
@@ -353,13 +454,14 @@ export function convert(
   kind: EncodeKind,
   crf: number,
   outputDir: string,
-  durationSec: number,
+  info: MediaInfo | null,
   onProgress: (percent: number, speed: number | null) => void,
 ): RunHandle {
   const output = outputPathFor(input, kind, outputDir)
+  const durationSec = info?.durationSec ?? 0
   let cancelled = false
 
-  const child = spawn(ffmpegPath ?? 'ffmpeg', argsFor(kind, crf, input, output), {
+  const child = spawn(ffmpegPath ?? 'ffmpeg', argsFor(kind, crf, input, output, info), {
     windowsHide: true,
   })
 

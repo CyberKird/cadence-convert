@@ -2,13 +2,19 @@ import type { ReactNode } from 'react'
 import {
   AUDIO_BITRATES,
   ENCODER_LABELS,
+  LANGUAGE_CODES,
   type AppSettings,
   type EncoderChoice,
   type FfmpegStatus,
+  type Language,
+  type ThemeMode,
   type UpdateStatus,
   type VideoEncoder,
 } from '../../../shared/types'
-import { CheckGlyph, DownloadGlyph, FolderGlyph, Spinner } from './indicators'
+import { nativeName, type Translate } from '../../../shared/i18n'
+import { useI18n } from '../i18n'
+import { Segmented, Select, Slider, Toggle } from './controls'
+import { BackGlyph, CheckGlyph, DownloadGlyph, FolderGlyph, RestartGlyph, Spinner } from './indicators'
 
 const ENCODER_ORDER: EncoderChoice[] = ['auto', 'h264_nvenc', 'h264_amf', 'h264_qsv', 'libx264']
 
@@ -18,7 +24,9 @@ export function Settings({
   detected,
   update,
   version,
+  onBack,
   onPatch,
+  onTheme,
   onPickFolder,
   onCheckUpdate,
   onDownloadUpdate,
@@ -29,225 +37,248 @@ export function Settings({
   detected: VideoEncoder | null
   update: UpdateStatus
   version: string
+  onBack: () => void
   onPatch: (patch: Partial<AppSettings>) => void
+  onTheme: (mode: ThemeMode, origin: HTMLElement | null) => void
   onPickFolder: () => void
   onCheckUpdate: () => void
   onDownloadUpdate: () => void
   onInstallUpdate: () => void
 }) {
+  const { t, systemLang } = useI18n()
+  const encoderLabel = (e: EncoderChoice): string =>
+    e === 'auto' ? t('enc.auto') : e === 'libx264' ? t('enc.cpu') : ENCODER_LABELS[e]
+
   return (
-    <div className="settings">
-      <Section title="Encoding">
-        <Row
-          label="Encoder"
-          hint={
-            settings.encoder === 'auto' && detected
-              ? `Probed at startup and picked ${ENCODER_LABELS[detected]}`
-              : 'Forced. Falls back to the processor if the card refuses it.'
-          }
-        >
-          <select
-            className="select"
-            value={settings.encoder}
-            onChange={(e) => onPatch({ encoder: e.target.value as EncoderChoice })}
-          >
-            {ENCODER_ORDER.map((key) => (
-              <option key={key} value={key}>
-                {ENCODER_LABELS[key]}
-                {key === 'auto' && detected ? ` (${ENCODER_LABELS[detected]})` : ''}
-              </option>
-            ))}
-          </select>
-        </Row>
+    <section className="settings glass">
+      <header className="settings-head">
+        <button className="btn btn-quiet btn-back" onClick={onBack}>
+          <BackGlyph size={16} />
+          {t('settings.back')}
+        </button>
+        <h1 className="settings-title">{t('settings.title')}</h1>
+      </header>
 
-        <Row
-          label="Quality"
-          hint="Lower keeps more detail and costs size. 18 is near invisible loss."
-        >
-          <div className="row-control">
-            <input
-              className="slider"
-              type="range"
-              min={12}
-              max={30}
-              value={settings.crf}
-              onChange={(e) => onPatch({ crf: Number(e.target.value) })}
-            />
-            <span className="numeral" style={{ width: 22, textAlign: 'right' }}>
-              {settings.crf}
-            </span>
-          </div>
-        </Row>
-
-        <Row label="Audio bitrate" hint="Applied to both presets.">
-          <select
-            className="select"
-            value={settings.audioBitrate}
-            onChange={(e) => onPatch({ audioBitrate: Number(e.target.value) })}
-          >
-            {AUDIO_BITRATES.map((b) => (
-              <option key={b} value={b}>
-                {b} kbps
-              </option>
-            ))}
-          </select>
-        </Row>
-      </Section>
-
-      <Section title="Output">
-        <Row label="Folder" hint={settings.outputDir || 'Written beside each source file.'}>
-          <div className="row-control">
-            <button className="btn btn-quiet" style={{ height: 32 }} onClick={onPickFolder}>
-              <FolderGlyph size={13} />
-              Choose
-            </button>
-            {settings.outputDir && (
-              <button
-                className="btn btn-quiet"
-                style={{ height: 32 }}
-                onClick={() => onPatch({ outputDir: '' })}
+      <div className="settings-scroll">
+        <div className="settings-body">
+          <Section title={t('sec.general')} index={0}>
+            <Row label={t('set.language')} hint={t('set.languageHint')}>
+              <Select<Language>
+                label={t('set.language')}
+                value={settings.language}
+                onChange={(language) => onPatch({ language })}
+                options={[
+                  { value: 'system', label: t('set.languageSystem', { name: nativeName(systemLang) }) },
+                  ...LANGUAGE_CODES.map((code) => ({ value: code as Language, label: nativeName(code) })),
+                ]}
+              />
+            </Row>
+            <Row label={t('set.theme')}>
+              <div
+                // The reveal starts from whichever segment was pressed.
+                onClickCapture={(e) => (lastOrigin = e.target as HTMLElement)}
               >
-                Reset
-              </button>
-            )}
-          </div>
-        </Row>
-      </Section>
+                <Segmented<ThemeMode>
+                  label={t('set.theme')}
+                  value={settings.theme}
+                  onChange={(mode) => onTheme(mode, lastOrigin)}
+                  options={[
+                    { value: 'system', label: t('set.themeSystem') },
+                    { value: 'light', label: t('set.themeLight') },
+                    { value: 'dark', label: t('set.themeDark') },
+                  ]}
+                />
+              </div>
+            </Row>
+            <Row label={t('set.motion')} hint={t('set.motionHint')}>
+              <Toggle
+                label={t('set.motion')}
+                on={!settings.animations}
+                onChange={(reduce) => onPatch({ animations: !reduce })}
+              />
+            </Row>
+          </Section>
 
-      <Section title="Behaviour">
-        <Row
-          label="Keep the machine awake"
-          hint="While a queue runs. Turning this off risks a truncated file if the machine sleeps."
-        >
-          <Toggle on={settings.keepAwake} onChange={(v) => onPatch({ keepAwake: v })} />
-        </Row>
+          <Section title={t('sec.encoding')} index={1}>
+            <Row
+              label={t('set.encoder')}
+              hint={
+                settings.encoder === 'auto' && detected
+                  ? t('set.encoderAuto', { name: encoderLabel(detected) })
+                  : t('set.encoderForced')
+              }
+            >
+              <Select<EncoderChoice>
+                label={t('set.encoder')}
+                value={settings.encoder}
+                onChange={(encoder) => onPatch({ encoder })}
+                options={ENCODER_ORDER.map((e) => ({
+                  value: e,
+                  label:
+                    e === 'auto' && detected
+                      ? `${encoderLabel(e)} (${encoderLabel(detected)})`
+                      : encoderLabel(e),
+                }))}
+              />
+            </Row>
+            <Row label={t('set.quality')} hint={t('quality.hint')}>
+              <div className="row-control">
+                <Slider
+                  min={12}
+                  max={30}
+                  value={settings.crf}
+                  label={t('set.quality')}
+                  onChange={(crf) => onPatch({ crf })}
+                />
+                <span className="numeral control-value">{settings.crf}</span>
+              </div>
+            </Row>
+            <Row label={t('set.audio')} hint={t('set.audioHint')}>
+              <Segmented<number>
+                label={t('set.audio')}
+                value={settings.audioBitrate}
+                onChange={(audioBitrate) => onPatch({ audioBitrate })}
+                options={AUDIO_BITRATES.map((b) => ({
+                  value: b,
+                  label: <span className="numeral">{b}</span>,
+                }))}
+              />
+            </Row>
+          </Section>
 
-        <Row label="Animations" hint="Turn off for the quietest possible interface.">
-          <Toggle on={settings.animations} onChange={(v) => onPatch({ animations: v })} />
-        </Row>
+          <Section title={t('sec.output')} index={2}>
+            <Row label={t('set.folder')} hint={settings.outputDir || t('output.beside')}>
+              <div className="row-control">
+                {settings.outputDir && (
+                  <button className="btn btn-quiet btn-sm" onClick={() => onPatch({ outputDir: '' })}>
+                    {t('output.reset')}
+                  </button>
+                )}
+                <button className="btn btn-outline btn-sm" onClick={onPickFolder}>
+                  <FolderGlyph size={14} />
+                  {t('output.change')}
+                </button>
+              </div>
+            </Row>
+          </Section>
 
-        <Row label="Theme" hint="Follows the system unless you pick one.">
-          <select
-            className="select"
-            value={settings.theme}
-            onChange={(e) => onPatch({ theme: e.target.value as AppSettings['theme'] })}
-          >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </Row>
-      </Section>
+          <Section title={t('sec.power')} index={3}>
+            <Row label={t('set.awake')} hint={t('set.awakeHint')}>
+              <Toggle
+                label={t('set.awake')}
+                on={settings.keepAwake}
+                onChange={(keepAwake) => onPatch({ keepAwake })}
+              />
+            </Row>
+          </Section>
 
-      <Section title="Updates">
-        <Row label="Version" hint="Releases come from the project's GitHub page.">
-          <span className="numeral" style={{ fontSize: 13 }}>
-            {version ? `v${version}` : '--'}
-          </span>
-        </Row>
+          <Section title={t('sec.updates')} index={4}>
+            <Row label={t('set.version')} hint={t('set.versionHint')}>
+              <span className="numeral control-value">{version ? `v${version}` : '--'}</span>
+            </Row>
+            <Row label={t('set.autoCheck')} hint={t('set.autoCheckHint')}>
+              <Toggle
+                label={t('set.autoCheck')}
+                on={settings.autoCheckUpdates}
+                onChange={(autoCheckUpdates) => onPatch({ autoCheckUpdates })}
+              />
+            </Row>
+            <Row label={t('set.status')} hint={updateText(update, t)} live>
+              <div className="row-control">
+                {update.state === 'checking' && <Spinner size={16} />}
+                {update.state === 'downloading' && (
+                  <div className="mini-track" aria-hidden>
+                    <div style={{ clipPath: `inset(0 ${100 - update.percent}% 0 0 round 99px)` }} />
+                  </div>
+                )}
+                {update.state === 'available' && (
+                  <button className="btn solid btn-sm" onClick={onDownloadUpdate}>
+                    <DownloadGlyph size={14} />
+                    {t('upd.download')}
+                  </button>
+                )}
+                {update.state === 'ready' && (
+                  <button className="btn solid btn-sm" onClick={onInstallUpdate}>
+                    <RestartGlyph size={14} />
+                    {t('upd.install')}
+                  </button>
+                )}
+                {(update.state === 'idle' || update.state === 'error') && (
+                  <button className="btn btn-outline btn-sm" onClick={onCheckUpdate}>
+                    {update.message === 'latest' && <CheckGlyph size={14} />}
+                    {t('upd.check')}
+                  </button>
+                )}
+              </div>
+            </Row>
+          </Section>
 
-        <Row label="Check on launch" hint="Only checks. Downloading is always your call.">
-          <Toggle
-            on={settings.autoCheckUpdates}
-            onChange={(v) => onPatch({ autoCheckUpdates: v })}
-          />
-        </Row>
-
-        <Row label="Status" hint={updateHint(update)}>
-          <div className="row-control">
-            {update.state === 'checking' && <Spinner />}
-            {update.state === 'downloading' && (
-              <span className="numeral" style={{ fontSize: 13 }}>
-                {update.percent}%
-              </span>
-            )}
-            {update.state === 'available' && (
-              <button className="btn solid" style={{ height: 32 }} onClick={onDownloadUpdate}>
-                <DownloadGlyph size={13} />
-                Download
-              </button>
-            )}
-            {update.state === 'ready' && (
-              <button className="btn solid" style={{ height: 32 }} onClick={onInstallUpdate}>
-                <CheckGlyph size={13} />
-                Restart and install
-              </button>
-            )}
-            {(update.state === 'idle' || update.state === 'error') && (
-              <button
-                className="btn btn-quiet"
-                style={{ height: 32 }}
-                onClick={onCheckUpdate}
-              >
-                Check now
-              </button>
-            )}
-          </div>
-        </Row>
-      </Section>
-
-      <Section title="System">
-        <Row label="ffmpeg" hint={ffmpeg.path ?? 'Not found on PATH or at C:\\ffmpeg\\bin.'}>
-          <span className="numeral" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-            {ffmpeg.version ?? 'missing'}
-          </span>
-        </Row>
-        <Row label="Active encoder" hint="What the next queue will actually use.">
-          <span className="pill">{ffmpeg.videoEncoder}</span>
-        </Row>
-      </Section>
-    </div>
-  )
-}
-
-function updateHint(u: UpdateStatus): string {
-  switch (u.state) {
-    case 'checking':
-      return 'Asking GitHub.'
-    case 'available':
-      return `Version ${u.version} is waiting.`
-    case 'downloading':
-      return 'Downloading in the background.'
-    case 'ready':
-      return `Version ${u.version} installs on restart.`
-    case 'error':
-      return u.message ?? 'The check failed.'
-    default:
-      return u.message ?? 'Up to date.'
-  }
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="settings-section">
-      <span className="label">{title}</span>
-      <div className="settings-rows">{children}</div>
+          <Section title={t('sec.system')} index={5}>
+            <Row label={t('set.ffmpeg')} hint={ffmpeg.path ?? undefined}>
+              <span className="numeral control-value">{ffmpeg.version ?? t('set.ffmpegMissing')}</span>
+            </Row>
+            <Row label={t('set.active')} hint={t('set.activeHint')}>
+              <span className="tag tag-lg">{encoderLabel(ffmpeg.videoEncoder)}</span>
+            </Row>
+          </Section>
+        </div>
+      </div>
     </section>
   )
 }
 
-function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+/** Remembered between the capture and the change, so the theme reveal knows where it began. */
+let lastOrigin: HTMLElement | null = null
+
+function updateText(u: UpdateStatus, t: Translate): string {
+  switch (u.state) {
+    case 'checking':
+      return t('upd.checking')
+    case 'available':
+      return t('upd.available', { v: u.version ?? '' })
+    case 'downloading':
+      return t('upd.downloading', { p: u.percent })
+    case 'ready':
+      return t('upd.ready', { v: u.version ?? '' })
+    case 'error':
+      // electron-updater errors can run to a stack trace; the first line is the useful part.
+      return t('upd.error', { msg: (u.message ?? '').split('\n')[0].slice(0, 160) })
+    default:
+      return u.message === 'latest' ? t('upd.latest') : u.message === 'dev' ? t('upd.dev') : t('upd.idle')
+  }
+}
+
+function Section({ title, index, children }: { title: string; index: number; children: ReactNode }) {
+  return (
+    <section className="settings-section" style={{ animationDelay: `${index * 45}ms` }}>
+      <h2>{title}</h2>
+      <div className="settings-group">{children}</div>
+    </section>
+  )
+}
+
+function Row({
+  label,
+  hint,
+  live,
+  children,
+}: {
+  label: string
+  hint?: string
+  live?: boolean
+  children: ReactNode
+}) {
   return (
     <div className="settings-row">
       <div className="settings-text">
         <span className="settings-label">{label}</span>
-        {hint && <span className="settings-hint">{hint}</span>}
+        {hint && (
+          <span className="settings-hint" aria-live={live ? 'polite' : undefined}>
+            {hint}
+          </span>
+        )}
       </div>
       {children}
     </div>
-  )
-}
-
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      className="toggle"
-      role="switch"
-      aria-checked={on}
-      data-on={on}
-      onClick={() => onChange(!on)}
-    >
-      <span className="toggle-knob" />
-    </button>
   )
 }

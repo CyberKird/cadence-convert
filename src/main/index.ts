@@ -8,11 +8,11 @@ import type {
   FfmpegStatus,
   JobOutput,
   JobProgress,
+  MediaInfo,
   Preset,
   QueueFile,
   ThemeMode,
 } from '../shared/types'
-import { BOTH_CRF } from '../shared/types'
 import {
   activeEncoder,
   configure,
@@ -21,8 +21,10 @@ import {
   locate,
   outputPathFor,
   probe,
+  thumbnail,
   type RunHandle,
 } from './ffmpeg'
+import { resolveLanguage, translator } from '../shared/i18n'
 import * as shutdown from './shutdown'
 import * as store from './store'
 import * as updater from './updater'
@@ -55,16 +57,37 @@ const VIDEO_EXTENSIONS = new Set([
   '.mpeg',
 ])
 
+/** Dialog titles follow the same language the interface shows. */
+function t(): ReturnType<typeof translator> {
+  return translator(resolveLanguage(store.read().language, app.getLocale()))
+}
+
+/**
+ * The window draws its own title bar and keeps the native Windows buttons,
+ * painted over the page. Their glyph colour has to follow the theme or they
+ * vanish on one of the two grounds, so the renderer reports each change.
+ */
+const CHROME = {
+  light: { color: '#00000000', symbolColor: '#16161a' },
+  dark: { color: '#00000000', symbolColor: '#ededf0' },
+}
+const TITLE_BAR_HEIGHT = 52
+
 function createWindow(): void {
+  const dark = nativeTheme.shouldUseDarkColors
   mainWindow = new BrowserWindow({
-    width: 1040,
-    height: 760,
-    minWidth: 880,
-    minHeight: 620,
+    width: 1180,
+    height: 800,
+    minWidth: 940,
+    minHeight: 640,
     show: false,
     autoHideMenuBar: true,
-    icon: join(__dirname, '../../build/icon.png'),
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#08080a' : '#e9e9ec',
+    // A packaged build takes the window icon from the executable. In
+    // development there is no executable of ours, so the png stands in.
+    ...(app.isPackaged ? {} : { icon: join(__dirname, '../../build/icon.png') }),
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { ...(dark ? CHROME.dark : CHROME.light), height: TITLE_BAR_HEIGHT },
+    backgroundColor: dark ? '#09090b' : '#ececef',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       // The renderer only draws. Every file and process action is an IPC call
@@ -103,11 +126,12 @@ async function describe(path: string): Promise<QueueFile> {
     const info = await stat(path)
     sizeBytes = info.size
   } catch {
-    return { id, path, name, sizeBytes: 0, info: null, error: 'file not found' }
+    return { id, path, name, sizeBytes: 0, info: null, error: 'file not found', thumb: null }
   }
 
   try {
-    return { id, path, name, sizeBytes, info: await probe(path), error: null }
+    const info = await probe(path)
+    return { id, path, name, sizeBytes, info, error: null, thumb: await thumbnail(path, info.durationSec) }
   } catch (err) {
     return {
       id,
@@ -116,6 +140,7 @@ async function describe(path: string): Promise<QueueFile> {
       sizeBytes,
       info: null,
       error: err instanceof Error ? err.message : 'unreadable',
+      thumb: null,
     }
   }
 }
@@ -126,9 +151,9 @@ function registerIpc(): void {
 
   ipcMain.handle('files:pick', async (): Promise<QueueFile[]> => {
     const result = await dialog.showOpenDialog({
-      title: 'Choose clips',
+      title: t()('dialog.pick'),
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Video', extensions: [...VIDEO_EXTENSIONS].map((e) => e.slice(1)) }],
+      filters: [{ name: t()('dialog.video'), extensions: [...VIDEO_EXTENSIONS].map((e) => e.slice(1)) }],
     })
     if (result.canceled) return []
     return Promise.all(result.filePaths.map(describe))
@@ -146,7 +171,7 @@ function registerIpc(): void {
 
   ipcMain.handle('dir:pick', async (): Promise<string | null> => {
     const result = await dialog.showOpenDialog({
-      title: 'Output folder',
+      title: t()('dialog.output'),
       properties: ['openDirectory', 'createDirectory'],
     })
     return result.canceled ? null : (result.filePaths[0] ?? null)
@@ -155,12 +180,9 @@ function registerIpc(): void {
   ipcMain.handle('convert:start', async (_e, request: ConvertRequest): Promise<void> => {
     if (!ffmpeg.available) return
 
-    const preset: Preset =
-      request.preset === 'transfer' ? 'transfer' : request.preset === 'both' ? 'both' : 'premiere'
-    const stages: EncodeKind[] = preset === 'both' ? ['premiere', 'transfer'] : [preset]
-    // 'both' pins its own quality, so neither copy ends up the weaker one.
-    // Otherwise clamped here as well, because this becomes an ffmpeg argument.
-    const crf = preset === 'both' ? BOTH_CRF : Math.min(30, Math.max(12, Math.round(request.crf)))
+    const stages: EncodeKind[] = [request.preset === 'shorts' ? 'shorts' : 'premiere']
+    // Clamped here as well, because this becomes an ffmpeg argument.
+    const crf = Math.min(30, Math.max(12, Math.round(request.crf)))
     const outputDir = typeof request.outputDir === 'string' ? request.outputDir : ''
 
     stopRequested = false
@@ -189,12 +211,12 @@ function registerIpc(): void {
           continue
         }
 
-        let durationSec = 0
+        let info: MediaInfo | null = null
         try {
-          durationSec = (await probe(entry.path)).durationSec
+          info = await probe(entry.path)
         } catch {
-          // Duration only drives the percentage, so a failure here still lets
-          // the encode run with an indeterminate bar.
+          // Duration drives the percentage and size picks the shorts bitrate,
+          // both of which have fallbacks, so the encode still runs.
         }
 
         const outputs: JobOutput[] = []
@@ -209,8 +231,8 @@ function registerIpc(): void {
             break
           }
 
-          // Each stage owns an equal slice of the bar, so 'both' fills once
-          // from end to end rather than resetting halfway.
+          // Each stage owns an equal slice of the bar. Every preset is one
+          // stage today, but a multi file preset would fill once end to end.
           const base = i / stages.length
           const span = 1 / stages.length
           const stage = stages.length > 1 ? kind : null
@@ -232,7 +254,7 @@ function registerIpc(): void {
             kind,
             crf,
             outputDir,
-            durationSec,
+            info,
             (nextPercent, nextSpeed) => {
               // A negative percent is the speed only signal from the parser.
               if (nextPercent >= 0) percent = base + nextPercent * span
@@ -321,6 +343,16 @@ function registerIpc(): void {
   ipcMain.handle('settings:update', (_e, patch: Partial<AppSettings>) => store.write(patch))
 
   ipcMain.handle('encoder:detected', () => detectedEncoder())
+
+  ipcMain.handle('app:locale', () => app.getLocale())
+
+  ipcMain.handle('window:chrome', (_e, theme: unknown) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    mainWindow.setTitleBarOverlay({
+      ...(theme === 'dark' ? CHROME.dark : CHROME.light),
+      height: TITLE_BAR_HEIGHT,
+    })
+  })
 }
 
 app.whenReady().then(async () => {

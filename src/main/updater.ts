@@ -32,8 +32,10 @@ export function init(onChange: Emit): void {
     set({ state: 'available', version: info.version, percent: 0, message: null }),
   )
 
+  // 'latest' tells the interface a check really happened, so it can say "up
+  // to date" rather than leaving a silent idle that reads like nothing ran.
   autoUpdater.on('update-not-available', () =>
-    set({ state: 'idle', version: null, percent: 0, message: null }),
+    set({ state: 'idle', version: null, percent: 0, message: 'latest' }),
   )
 
   autoUpdater.on('download-progress', (p) =>
@@ -55,7 +57,7 @@ export function init(onChange: Emit): void {
  */
 export async function check(): Promise<UpdateStatus> {
   if (!app.isPackaged) {
-    set({ state: 'idle', message: 'updates only run in an installed build' })
+    set({ state: 'idle', message: 'dev' })
     return status
   }
   try {
@@ -77,7 +79,12 @@ export async function download(): Promise<UpdateStatus> {
   return status
 }
 
-/** Quits and runs the installer. Nothing after this call matters. */
+/**
+ * Quits, installs and starts the new version again. Silent, because the
+ * installer is the assisted kind and would otherwise walk the user through
+ * its whole wizard just to update. A per-user install needs no elevation, so
+ * nothing is lost by skipping it. Nothing after this call matters.
+ */
 export function install(): void {
-  if (status.state === 'ready') autoUpdater.quitAndInstall()
+  if (status.state === 'ready') autoUpdater.quitAndInstall(true, true)
 }

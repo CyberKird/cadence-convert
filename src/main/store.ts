@@ -1,7 +1,15 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
-import { AUDIO_BITRATES, type AppSettings, type EncoderChoice, type Preset, type ThemeMode } from '../shared/types'
+import {
+  AUDIO_BITRATES,
+  LANGUAGE_CODES,
+  type AppSettings,
+  type EncoderChoice,
+  type Language,
+  type Preset,
+  type ThemeMode,
+} from '../shared/types'
 
 const DEFAULTS: AppSettings = {
   theme: 'system',
@@ -13,10 +21,13 @@ const DEFAULTS: AppSettings = {
   keepAwake: true,
   animations: true,
   autoCheckUpdates: true,
+  language: 'system',
 }
 
 const THEMES: ThemeMode[] = ['light', 'dark', 'system']
-const PRESETS: Preset[] = ['premiere', 'transfer', 'both']
+// A saved 'transfer' or 'both' from an older version falls back to premiere.
+const PRESETS: Preset[] = ['premiere', 'shorts']
+const LANGUAGES: Language[] = ['system', ...LANGUAGE_CODES]
 const ENCODERS: EncoderChoice[] = ['auto', 'h264_nvenc', 'h264_amf', 'h264_qsv', 'libx264']
 
 function bool(value: unknown, fallback: boolean): boolean {
@@ -55,6 +66,9 @@ export function read(): AppSettings {
       keepAwake: bool(raw.keepAwake, DEFAULTS.keepAwake),
       animations: bool(raw.animations, DEFAULTS.animations),
       autoCheckUpdates: bool(raw.autoCheckUpdates, DEFAULTS.autoCheckUpdates),
+      language: LANGUAGES.includes(raw.language as Language)
+        ? (raw.language as Language)
+        : DEFAULTS.language,
     }
   } catch {
     cache = { ...DEFAULTS }

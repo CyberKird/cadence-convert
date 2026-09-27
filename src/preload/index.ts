@@ -19,6 +19,9 @@ import type {
  */
 const api = {
   getAppInfo: (): Promise<{ version: string }> => ipcRenderer.invoke('app:info'),
+  getLocale: (): Promise<string> => ipcRenderer.invoke('app:locale'),
+  /** Recolours the native window buttons to match the resolved theme. */
+  setChrome: (theme: 'light' | 'dark'): Promise<void> => ipcRenderer.invoke('window:chrome', theme),
   getFfmpegStatus: (): Promise<FfmpegStatus> => ipcRenderer.invoke('ffmpeg:status'),
   onFfmpegStatus: (cb: (s: FfmpegStatus) => void): (() => void) => {
     const listener = (_e: unknown, s: FfmpegStatus): void => cb(s)

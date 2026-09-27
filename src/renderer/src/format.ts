@@ -19,14 +19,44 @@ export function duration(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/** 3840 becomes 4K, 1920 becomes 1080p. Anything else keeps its height. */
+/**
+ * Named by the short edge, so a vertical 1080x1920 phone clip reads as 1080p
+ * and a 4096 wide DCI clip still reads as 4K.
+ */
 export function resolution(width: number, height: number): string {
   if (!width || !height) return '--'
-  if (width >= 3800) return '4K'
-  if (width >= 2500) return '1440p'
-  if (width >= 1900) return '1080p'
-  if (width >= 1200) return '720p'
-  return `${height}p`
+  const short = Math.min(width, height)
+  if (short >= 2100) return '4K'
+  if (short >= 1400) return '1440p'
+  if (short >= 1000) return '1080p'
+  if (short >= 700) return '720p'
+  return `${short}p`
+}
+
+/** hevc becomes HEVC, h264 becomes H.264; anything else is shown as ffprobe names it. */
+export function codec(name: string): string {
+  const known: Record<string, string> = {
+    h264: 'H.264',
+    hevc: 'HEVC',
+    av1: 'AV1',
+    vp9: 'VP9',
+    prores: 'ProRes',
+    mpeg2video: 'MPEG-2',
+    mpeg4: 'MPEG-4',
+  }
+  return known[name] ?? name.toUpperCase()
+}
+
+/** m:ss under an hour, h:mm:ss above, for remaining time next to a bar. */
+export function clock(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '--'
+  const total = Math.round(seconds)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`
 }
 
 export function fps(value: number): string {
@@ -47,5 +77,6 @@ export function countdown(ms: number): string {
 export function delta(before: number, after: number): string {
   if (!before || !after) return ''
   const change = Math.round(((after - before) / before) * 100)
-  return change <= 0 ? `${change}%` : `+${change}%`
+  // A real minus sign, which sits at the width and height of the plus.
+  return change <= 0 ? `−${Math.abs(change)}%` : `+${change}%`
 }
