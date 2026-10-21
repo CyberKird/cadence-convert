@@ -7,7 +7,7 @@ that upload as they are to YouTube, TikTok and Instagram.
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-[![Support me on Ko-fi](https://raw.githubusercontent.com/CyberKird/.github/main/assets/ko-fi-button.svg)](https://ko-fi.com/joltarise)
+<a href="https://ko-fi.com/joltarise"><img src="https://raw.githubusercontent.com/CyberKird/.github/main/assets/ko-fi-button.svg" alt="Support me on Ko-fi" width="200"></a>
 
 ## Why
 
