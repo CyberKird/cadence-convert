@@ -7,6 +7,8 @@ that upload as they are to YouTube, TikTok and Instagram.
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/joltarise)
+
 ## Why
 
 Footage that crashes or stutters in an editor usually does so for boring
