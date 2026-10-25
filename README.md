@@ -5,7 +5,7 @@ actually work with, into copies ready for a shorts editor, and into copies
 that upload as they are to YouTube, TikTok and Instagram.
 
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
-![license](https://img.shields.io/badge/license-MIT-blue)
+![license](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 <a href="https://ko-fi.com/joltarise"><img src="https://raw.githubusercontent.com/CyberKird/.github/main/assets/ko-fi-button.svg" alt="Support me on Ko-fi" width="200"></a>
 
@@ -98,4 +98,4 @@ process validates, with context isolation and sandboxing on.
 
 ## License
 
-MIT
+Copyright (C) 2026 CyberKird. Cadence Convert is free software under the [GNU General Public License v3.0 or later](LICENSE): you can read, build, share and change it, and any modified version you distribute must stay open under the same license.

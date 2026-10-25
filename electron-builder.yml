@@ -1,6 +1,6 @@
 appId: com.cyberkird.cadenceconvert
 productName: Cadence Convert
-copyright: MIT
+copyright: GPL-3.0-or-later
 
 directories:
   output: release
